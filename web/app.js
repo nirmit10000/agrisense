@@ -1,6 +1,5 @@
-/* AgriSense static site: everything runs in the browser.
- * Irrigation seasons are precomputed in Python (agrisense/export_web.py -> web/data/irrigation.json).
- * The leaf CNN runs on-device with ONNX Runtime Web (web/models/leaf.onnx). */
+/* AgriSense static site.
+ * Irrigation seasons are precomputed in Python (agrisense/export_web.py -> web/data/irrigation.json). */
 (() => {
   "use strict";
 
@@ -13,8 +12,6 @@
   const state = { tab: "overview", crop: "Maize", city: "Jodhpur", season: null, year: 2023,
                   show: new Set([RL, THR]), rbCrop: "Maize", rbStage: 2, rbEt0: 2 };
   let D = null;                 // irrigation data
-  let leafMeta = null;          // results/leaf_metrics.json (optional)
-  let leafClasses = null, leafSession = null, leafLoading = null, lastCam = null;
   const charts = {};
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -28,7 +25,7 @@
     ink.style.transform = `translateX(${btn.offsetLeft}px)`;
   }
   function selectTab(name) {
-    name = { agent: "irrigation", results: "irrigation", about: "overview" }[name] || name;   // old links
+    name = { agent: "irrigation", results: "irrigation", about: "overview", leaf: "overview" }[name] || name;   // old links
     if (!$(`[data-panel="${name}"]`)) name = "overview";
     state.tab = name;
     $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -38,7 +35,6 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
     requestAnimationFrame(() => {
       if (name === "irrigation") { renderIrrigation(); renderAgent(); renderResults(); }
-      if (name === "leaf") { initLeaf(); renderLeafResults(); }
       Object.values(charts).forEach(c => c && c.resize());
     });
   }
@@ -294,175 +290,15 @@
         data: cities.map(c => D.summary.by_city.find(r => r.city === c && r.policy === p).water) })),
     });
   }
-  function renderLeafResults() {
-    const box = $("#leaf-results");
-    if (!leafMeta) { box.querySelector("#leaf-kpis").innerHTML = `<p class="sub">Leaf model metrics not available yet.</p>`; return; }
-    $("#leaf-kpis").innerHTML = [
-      [`${fmt(100 * leafMeta.test_accuracy, 1)}%`, "test accuracy"], [fmt(leafMeta.macro_f1, 3), "macro F1"],
-      [leafMeta.n_images ? leafMeta.n_images.test : "—", "held-out test images"], [leafMeta.classes ? leafMeta.classes.length : 14, "classes"],
-    ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
-    if (leafMeta.per_class) {
-      $("#leaf-table").innerHTML = `<thead><tr><th>Crop</th><th>Class</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th><th class="num">Test images</th></tr></thead><tbody>` +
-        leafMeta.per_class.map(r => `<tr><td>${r.crop}</td><td>${r.name}</td><td class="num">${fmt(r.precision, 3)}</td><td class="num">${fmt(r.recall, 3)}</td><td class="num">${fmt(r.f1, 3)}</td><td class="num">${r.support}</td></tr>`).join("") + "</tbody>";
-    }
-  }
-
-  /* ------------------------------------------------------------------ leaf doctor */
-  const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225], SIZE = 224;
-
-  async function initLeaf() {
-    if (leafClasses) return;
-    try {
-      const [cls, man] = await Promise.all([
-        fetch("web/data/leaf_classes.json").then(r => r.json()),
-        fetch("web/samples/manifest.json").then(r => r.json()).catch(() => []),
-      ]);
-      leafClasses = cls;
-      const box = $("#samples"); box.innerHTML = "";
-      man.forEach(s => {
-        const b = document.createElement("button");
-        b.type = "button";
-        const c = cls[s.label_id];
-        b.title = `${c.crop}: ${c.name}`;
-        b.innerHTML = `<img src="${s.file}" alt="${c.crop} ${c.name} sample" loading="lazy">`;
-        b.addEventListener("click", () => loadImage(s.file, `${c.crop}: ${c.name}`));
-        box.appendChild(b);
-      });
-    } catch (err) {
-      $("#model-status").textContent = "Leaf model files are not available yet.";
-      return;
-    }
-    ensureSession();
-  }
-
-  function ensureSession() {
-    if (leafSession) return Promise.resolve(leafSession);
-    if (leafLoading) return leafLoading;
-    const st = $("#model-status");
-    st.textContent = "Loading the model…";
-    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
-    ort.env.wasm.numThreads = 1;
-    leafLoading = ort.InferenceSession.create("web/models/leaf.onnx", { executionProviders: ["wasm"] })
-      .then(s => {
-        leafSession = s;
-        st.textContent = `Model ready: MobileNetV2, ${leafClasses.length} classes.`;
-        return s;
-      })
-      .catch(err => { st.textContent = "Could not load the model: " + err.message; leafLoading = null; throw err; });
-    return leafLoading;
-  }
-
-  function loadImage(src, trueLabel) {
-    const img = new Image();
-    img.onload = () => diagnose(img, trueLabel);
-    img.src = src;
-  }
-
-  function preprocess(img) {
-    const cv = $("#leaf-canvas"), ctx = cv.getContext("2d", { willReadFrequently: true });
-    const w = img.naturalWidth, h = img.naturalHeight;
-    const scale = 256 / Math.min(w, h), crop = SIZE / scale;        // resize short side to 256, centre-crop 224
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-    ctx.clearRect(0, 0, SIZE, SIZE);
-    ctx.drawImage(img, (w - crop) / 2, (h - crop) / 2, crop, crop, 0, 0, SIZE, SIZE);
-    const px = ctx.getImageData(0, 0, SIZE, SIZE).data, n = SIZE * SIZE;
-    const data = new Float32Array(3 * n);
-    for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) data[c * n + i] = (px[i * 4 + c] / 255 - MEAN[c]) / STD[c];
-    return data;
-  }
-
-  async function diagnose(img, trueLabel) {
-    $("#viewer-empty").hidden = true;
-    const input = preprocess(img);
-    $("#cam-canvas").getContext("2d").clearRect(0, 0, SIZE, SIZE);
-    $("#predictions").innerHTML = `<p class="sub">Analysing…</p>`;
-    $("#advice").hidden = true;
-    let session;
-    try { session = await ensureSession(); } catch { $("#predictions").innerHTML = ""; return; }
-    const t0 = performance.now();
-    const out = await session.run({ input: new ort.Tensor("float32", input, [1, 3, SIZE, SIZE]) });
-    const ms = performance.now() - t0;
-    const logits = Array.from(out.logits.data), C = logits.length;
-    const mx = Math.max(...logits), ex = logits.map(v => Math.exp(v - mx)), sum = ex.reduce((a, b) => a + b, 0);
-    const probs = ex.map(v => v / sum);
-    const order = probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]).slice(0, 3);
-    const top = order[0][1];
-
-    $("#predictions").innerHTML = order.map(([p, i], k) => {
-      const c = leafClasses[i];
-      return `<div class="pred ${k === 0 ? "top" : ""}"><span class="name">${c.name} <small>· ${c.crop}</small></span>
-        <span class="pct">${fmt(100 * p, 1)}%</span><span class="bar"><i data-w="${100 * p}"></i></span></div>`;
-    }).join("") + `<p class="sub">${trueLabel ? `True label: <b>${trueLabel}</b> · ` : ""}inference ${fmt(ms)} ms</p>`;
-    requestAnimationFrame(() => $$(".pred .bar i").forEach(i => { i.style.width = i.dataset.w + "%"; }));
-    const tc = leafClasses[top], adv = $("#advice");
-    adv.hidden = false;
-    adv.className = "advice" + (tc.healthy ? " healthy" : "");
-    adv.innerHTML = `<b>${tc.healthy ? "Looks healthy" : tc.crop + " · " + tc.name}</b><br>${tc.advice}`;
-
-    if (out.cam) {
-      const cam = out.cam.data, k = out.cam.dims[2], off = top * k * k;
-      lastCam = Array.from(cam.slice(off, off + k * k)).map(v => Math.max(0, v));
-      lastCam.k = k;
-      drawCam();
-    }
-  }
-
-  function turbo(t) {   // compact approximation of the Turbo colormap
-    const r = Math.max(0, Math.min(1, 0.13572 + t * (4.6154 + t * (-42.66 + t * (132.13 + t * (-152.95 + t * 59.29))))));
-    const g = Math.max(0, Math.min(1, 0.09140 + t * (2.1942 + t * (4.84 + t * (-14.19 + t * (4.28 + t * 2.83))))));
-    const b = Math.max(0, Math.min(1, 0.10667 + t * (12.642 + t * (-60.58 + t * (110.36 + t * (-89.90 + t * 27.35))))));
-    return [r * 255, g * 255, b * 255];
-  }
-  function drawCam() {
-    const cv = $("#cam-canvas"), ctx = cv.getContext("2d");
-    if (!lastCam) return;
-    const k = lastCam.k, mx = Math.max(...lastCam) || 1;
-    const img = ctx.createImageData(SIZE, SIZE);
-    for (let y = 0; y < SIZE; y++) {
-      const gy = Math.min(k - 1.0001, Math.max(0, (y + 0.5) / SIZE * k - 0.5)), y0 = Math.floor(gy), fy = gy - y0;
-      for (let x = 0; x < SIZE; x++) {
-        const gx = Math.min(k - 1.0001, Math.max(0, (x + 0.5) / SIZE * k - 0.5)), x0 = Math.floor(gx), fx = gx - x0;
-        const v = (lastCam[y0 * k + x0] * (1 - fx) * (1 - fy) + lastCam[y0 * k + x0 + 1] * fx * (1 - fy) +
-                   lastCam[(y0 + 1) * k + x0] * (1 - fx) * fy + lastCam[(y0 + 1) * k + x0 + 1] * fx * fy) / mx;
-        const [r, g, b] = turbo(v), o = (y * SIZE + x) * 4;
-        img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 40 + 215 * v;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    applyCamStyle();
-  }
-  function applyCamStyle() {
-    const on = $("#cam-toggle").checked;
-    $("#cam-canvas").style.opacity = on ? $("#cam-alpha").value / 100 : 0;
-  }
-  $("#cam-toggle").addEventListener("change", applyCamStyle);
-  $("#cam-alpha").addEventListener("input", applyCamStyle);
-  $("#leaf-file").addEventListener("change", e => {
-    const f = e.target.files[0];
-    if (f) loadImage(URL.createObjectURL(f));
-  });
-  const dz = $("#dropzone");
-  ["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); }));
-  ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
-  dz.addEventListener("drop", e => {
-    const f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith("image/")) loadImage(URL.createObjectURL(f));
-  });
-
   /* ------------------------------------------------------------------ boot */
   async function boot() {
-    const [data, meta] = await Promise.all([
-      fetch("web/data/irrigation.json").then(r => r.json()),
-      fetch("results/leaf_metrics.json").then(r => (r.ok ? r.json() : null)).catch(() => null),
-    ]);
-    D = data; leafMeta = meta;
+    D = await fetch("web/data/irrigation.json").then(r => r.json());
     const rl = D.summary.by_policy.find(r => r.policy === RL), fx = D.summary.by_policy.find(r => r.policy === FIX);
     $("#ov-save").textContent = `${fmt(100 * (1 - rl.avg_irrigation_mm / fx.avg_irrigation_mm))}%`;
     $("#ov-yield").textContent = `${fmt(rl.avg_relative_yield_pct, 1)}%`;
-    if (leafMeta) {
-      $("#ov-acc").textContent = `${fmt(100 * leafMeta.test_accuracy, 1)}%`;
-      $("#ov-classes").textContent = leafMeta.classes ? leafMeta.classes.length : 14;
-    }
+    const th = D.summary.by_policy.find(r => r.policy === THR);
+    $("#ov-thr").textContent = `${fmt(100 * (1 - rl.avg_irrigation_mm / th.avg_irrigation_mm), 1)}%`;
+    $("#ov-n").textContent = D.summary.n_test_seasons;
     state.season = Object.keys(D.crops[state.crop].seasons)[0];
     buildControls();
     selectTab((location.hash || "#overview").slice(1));

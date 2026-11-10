@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AgriSense</title>
-  <meta name="description" content="A reinforcement-learning irrigation agent and a CNN leaf disease detector.">
+  <meta name="description" content="A reinforcement-learning agent that decides when and how much to irrigate.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
@@ -20,7 +20,6 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button role="tab" data-tab="irrigation">Smart irrigation</button>
-    <button role="tab" data-tab="leaf">Leaf doctor</button>
     <span class="tab-ink" aria-hidden="true"></span>
   </nav>
 </header>
@@ -30,13 +29,12 @@
 <section class="panel" id="tab-overview" data-panel="overview">
   <div class="hero">
     <div class="hero-text">
-      <p class="eyebrow">Smart irrigation · Crop health</p>
-      <h1>AI for water-smart,<br>disease-aware farming</h1>
-      <p class="lede">Two AI modules for the two everyday questions on a farm: <strong>how much should I water today?</strong>
-        and <strong>what is wrong with this leaf?</strong></p>
+      <p class="eyebrow">Smart irrigation · Reinforcement learning</p>
+      <h1>AI for water-smart<br>irrigation</h1>
+      <p class="lede">A reinforcement-learning agent answers the everyday question on a farm:
+        <strong>how much should I irrigate today?</strong> It learned from 16 years of real weather in three Indian climates.</p>
       <div class="hero-cta">
         <button class="btn primary" data-goto="irrigation">Try the irrigation agent</button>
-        <button class="btn" data-goto="leaf">Diagnose a leaf</button>
       </div>
     </div>
     <div class="hero-art" aria-hidden="true">
@@ -65,7 +63,7 @@
     </div>
   </div>
 
-  <div class="module-grid">
+  <div class="module-grid single">
     <article class="module-card" data-goto="irrigation">
       <div class="module-icon water">💧</div>
       <h2>Smart irrigation <span class="tag">Reinforcement learning</span></h2>
@@ -73,23 +71,15 @@
         driven by real weather from three Indian climates.</p>
       <div class="stat-row">
         <div><b id="ov-save">45%</b><span>less water than a fixed schedule</span></div>
+        <div><b id="ov-thr">5.5%</b><span>less water than the FAO sensor rule</span></div>
         <div><b id="ov-yield">98.1%</b><span>of maximum yield kept</span></div>
-      </div>
-    </article>
-    <article class="module-card" data-goto="leaf">
-      <div class="module-icon leaf">🌿</div>
-      <h2>Leaf doctor <span class="tag">Deep learning (CNN)</span></h2>
-      <p>A MobileNetV2 convolutional network, fine-tuned on maize and tomato leaves from PlantVillage, names the
-        disease and highlights the part of the leaf that drove the decision.</p>
-      <div class="stat-row">
-        <div><b id="ov-acc">—</b><span>test accuracy</span></div>
-        <div><b id="ov-classes">14</b><span>maize &amp; tomato classes</span></div>
+        <div><b id="ov-n">60</b><span>unseen test seasons</span></div>
       </div>
     </article>
   </div>
 
   <div class="card">
-    <h3>Module 1 · How the irrigation agent learns and decides</h3>
+    <h3>How the agent learns and decides</h3>
     <div class="flowchart">
       <div class="fnode data"><b>Weather data</b><span>Open-Meteo, 2010–2025<br>Pune · Jodhpur · Ludhiana</span></div>
       <div class="farrow"></div>
@@ -107,23 +97,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <h3>Module 2 · How a leaf photo becomes a diagnosis</h3>
-    <div class="flowchart">
-      <div class="fnode data"><b>Leaf photo</b><span>camera or upload</span></div>
-      <div class="farrow"></div>
-      <div class="fnode sim"><b>Pre-process</b><span>resize, centre-crop 224 × 224<br>ImageNet normalisation</span></div>
-      <div class="farrow"></div>
-      <div class="fnode model"><b>MobileNetV2</b><span>ImageNet-pretrained, fine-tuned<br>7 × 7 × 1280 feature maps</span></div>
-      <div class="farrow"></div>
-      <div class="fnode model"><b>Pool + classifier</b><span>global average pool<br>linear layer → 14 classes</span></div>
-      <div class="farrow"></div>
-      <div class="fnode out dark"><b>Diagnosis</b><span>top-3 classes + confidence<br>heatmap + advice</span></div>
-    </div>
-    <div class="flow-legend">
-      <span><i class="k-reward"></i>Heatmap (class activation map) = classifier weights × the 7 × 7 feature maps</span>
-    </div>
-  </div>
 </section>
 
 <!-- ============================================================ IRRIGATION -->
@@ -214,53 +187,9 @@
   </div>
 </section>
 
-<!-- ============================================================ LEAF -->
-<section class="panel" id="tab-leaf" data-panel="leaf" hidden>
-  <div class="leaf-grid">
-    <div class="card">
-      <h3>1 · Choose a leaf photo</h3>
-      <label class="dropzone" id="dropzone">
-        <input type="file" id="leaf-file" accept="image/*" capture="environment">
-        <span class="dz-icon">📷</span>
-        <span><b>Drop a photo here</b> or tap to upload / take a picture</span>
-        <small>Maize or tomato leaf, ideally one leaf filling the frame</small>
-      </label>
-      <p class="sub">…or try a sample from the test set:</p>
-      <div class="samples" id="samples"></div>
-      <p class="model-status" id="model-status">Model not loaded yet.</p>
-    </div>
-    <div class="card">
-      <h3>2 · Diagnosis</h3>
-      <div class="diag" id="diag">
-        <div class="viewer">
-          <canvas id="leaf-canvas" width="224" height="224"></canvas>
-          <canvas id="cam-canvas" width="224" height="224"></canvas>
-          <div class="viewer-empty" id="viewer-empty">Choose a photo</div>
-        </div>
-        <div class="cam-controls">
-          <label class="switch"><input type="checkbox" id="cam-toggle" checked><span></span> Heatmap</label>
-          <input type="range" id="cam-alpha" min="0" max="100" value="55" aria-label="Heatmap opacity">
-        </div>
-        <div id="predictions" class="predictions"></div>
-        <div id="advice" class="advice" hidden></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" id="leaf-results">
-    <h3>Test results: held-out leaf images</h3>
-    <div class="leaf-kpis" id="leaf-kpis"></div>
-    <div class="two-col">
-      <figure><img src="results/fig_leaf_confusion.png" alt="Confusion matrix of the leaf classifier" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Confusion matrix: rows are the true class, columns the prediction; the diagonal is correct.</figcaption></figure>
-      <figure><img src="results/fig_leaf_cam_examples.png" alt="Class activation heatmap examples" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Heatmaps: the highlighted regions drove each prediction.</figcaption></figure>
-    </div>
-    <div class="table-wrap"><table class="data" id="leaf-table"></table></div>
-  </div>
-</section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
 <script src="web/app.js"></script>
 </body>
 </html>

@@ -262,3 +262,5 @@ input[type=range] { width: 100%; accent-color: var(--green); }
   .farrow::after { left: calc(50% - 5px); right: auto; top: auto; bottom: 1px; border: 5px solid transparent; border-top: 7px solid #9AA59D; border-bottom: 0; }
   .farrow.both::before { width: auto; left: 0; right: 0; top: 50%; bottom: auto; transform: translateY(-50%) rotate(90deg); }
 }
+.module-grid.single { grid-template-columns: 1fr; }
+.module-grid.single .stat-row { flex-wrap: wrap; gap: 18px 44px; }

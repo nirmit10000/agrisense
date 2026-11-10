@@ -2,8 +2,7 @@
 
 Short answers to the questions examiners are most likely to ask. Irrigation numbers are from
 `results/summary_by_policy.csv` (60 unseen test seasons, 2021-2024); leaf-disease numbers are from
-`results/leaf_metrics.json`. Anything marked **[fill]** was not available yet when this sheet was
-written: copy it from that file.
+`results/leaf_metrics.json` (1,213 held-out test images).
 
 Live site: <https://nirmit10000.github.io/agrisense/>
 
@@ -14,7 +13,7 @@ Live site: <https://nirmit10000.github.io/agrisense/>
 > standard, driven by 16 years of real weather from Pune, Jodhpur and Ludhiana. On 60 seasons it never
 > saw, it used **45% less water than a fixed schedule with higher yield (98.1% vs 93.7%)**, and slightly
 > less water than an expert soil-sensor rule. For crop health, a MobileNetV2 CNN trained by transfer
-> learning on PlantVillage recognises 14 maize and tomato leaf classes with **[fill] test accuracy**, and
+> learning on PlantVillage recognises 14 maize and tomato leaf classes with **93.7% test accuracy**, and
 > a heatmap shows where on the leaf it looked. Both run in one website, with the disease model running on
 > the user's own device.
 
@@ -169,9 +168,9 @@ lookup table, so it could even run on a microcontroller.
 ## Leaf disease module
 
 **Leaf numbers to remember** (from `results/leaf_metrics.json`): 14 classes (maize + tomato) ·
-train / val / test images **[fill] / [fill] / [fill]** · test accuracy **[fill]** · macro F1 **[fill]** ·
-input **[fill]** px · head epochs **[fill]** + fine-tune epochs **[fill]** · training ~**[fill]** min on CPU ·
-browser model **[fill] MB**.
+train / val / test images **5,660 / 1,213 / 1,213** · test accuracy **93.7%** · macro F1 **0.937** ·
+input **224** px · head epochs **40** + fine-tune epochs **3** · training ~**11.5** min on CPU ·
+browser model **8.9 MB** · 28/28 demo samples correct in the browser (~65 ms each).
 
 **Q: Why a CNN for this?**
 Disease symptoms are visual patterns (spots, lesions, discoloured patches, mould). A convolutional
@@ -209,11 +208,21 @@ if it is on the background, we would know the model is cheating. It's coarse (on
 Validation is for choices during training; the test set is used once, at the end, so the reported
 accuracy is unbiased. Images per class were capped so that no class dominates and training stays fast.
 
-**Q: What does [fill]% accuracy actually mean?**
-Of the [fill] test leaves the model never saw during training, it named the correct class for [fill]%.
-We also report macro F1 ([fill]), which weights every class equally, so a weak rare class can't hide behind
+**Q: What does 93.7% accuracy actually mean?**
+Of the 1,213 test leaves the model never saw during training, it named the correct class for 93.7%.
+We also report macro F1 (0.937), which weights every class equally, so a weak rare class can't hide behind
 the big ones. The per-class table and confusion matrix show which diseases get confused (typically
 diseases with similar-looking spots on the same crop).
+
+**Q: Which classes are weakest, and why?**
+Three tomato diseases: Spider mites (F1 0.85, recall 73%), Early blight (F1 0.86, recall 79%) and
+Target spot (F1 0.86, precision 77%). Spider mites and Early blight are mostly mistaken for Target spot:
+all three show small dark or speckled spots on the leaf. Maize classes are much easier.
+
+**Q: Published PlantVillage models get 99%. Why only 93.7%?**
+We trained for 11.5 minutes on a laptop CPU, fine-tuning only the last 4 blocks for 3 epochs. Fine-tuning
+the whole network for more epochs on a GPU is the obvious next step and would close most of the gap. We
+chose a small model that runs on a phone over a big one.
 
 **Q: Would it work on photos from a real field?**
 Not as well, and we say so. PlantVillage photos are single leaves on a plain background in good light.
@@ -244,7 +253,7 @@ presentation. A static site has no server to crash or pay for. The Streamlit app
 for local experiments (`streamlit run app.py`).
 
 **Q: How can a CNN run on a static site with no server?**
-The model is a file like any image. The page downloads it once ([fill] MB) and ONNX Runtime Web runs the
+The model is a file like any image. The page downloads it once (8.9 MB) and ONNX Runtime Web runs the
 network in the browser using WebAssembly. Preprocessing (resize, normalise), the softmax and the CAM
 heatmap are a few lines of JavaScript.
 

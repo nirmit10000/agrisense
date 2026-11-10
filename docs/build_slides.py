@@ -279,7 +279,7 @@ for i, (lbl, col) in enumerate([("Module 1  ·  Reinforcement learning decides w
                                 ("Module 2  ·  A deep CNN diagnoses leaf diseases from a photo", LEAF)]):
     badge(s, 0.9, 4.3 + i * 0.6, str(i + 1), fill=col, d=0.42, size=13)
     text(s, 1.5, 4.36 + i * 0.6, 10, 0.4, lbl, size=17, color=WHITE)
-text(s, 0.9, 5.95, 8, 0.8, ["[Student 1 name]  ·  [Roll no.]", "[Student 2 name]  ·  [Roll no.]"], size=16,
+text(s, 0.9, 5.95, 8, 0.8, ["Dushyant Kumar  ·  23145030", "Nirmit Patil  ·  23145053"], size=16,
      color=WHITE)
 text(s, 7.4, 6.2, 5.2, 0.4, SITE_URL.replace("https://", ""), size=16, color=LEAF, bold=True, align=PP_ALIGN.RIGHT)
 

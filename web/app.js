@@ -166,7 +166,7 @@
       lineStyle: { width: 2.2, color: COLORS[p] }, itemStyle: { color: COLORS[p] }, smooth: 0.15,
       emphasis: { focus: "series" },
       markLine: p === shown[0] ? { silent: true, symbol: "none", lineStyle: { color: "#C0392B", type: "dashed", width: 1.2 },
-        label: { formatter: "stress line", color: "#C0392B", fontSize: 11, position: "insideEndTop" },
+        label: { formatter: "stress line", color: "#C0392B", fontSize: 11, position: "insideStartTop" },
         data: [{ yAxis: crop.stress_line_pct }] } : undefined,
     }));
     shown.forEach(p => series.push({
@@ -467,6 +467,7 @@
     state.season = Object.keys(D.crops[state.crop].seasons)[0];
     buildControls();
     selectTab((location.hash || "#overview").slice(1));
+    if (document.fonts) document.fonts.ready.then(moveInk);
   }
   boot().catch(err => { console.error(err); document.body.insertAdjacentHTML("afterbegin",
     `<p style="padding:12px;background:#FCE9E4;margin:0">Could not load data: ${err.message}. If you opened the file directly, serve the folder with <code>python -m http.server</code>.</p>`); });

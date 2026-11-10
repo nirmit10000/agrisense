@@ -194,8 +194,8 @@ para("Domain: Agriculture (intelligent irrigation, crop monitoring and resource 
 for _ in range(4):
     doc.add_paragraph()
 para("Submitted by", size=11, color=INK2, align=WD_ALIGN_PARAGRAPH.CENTER)
-para("[Student 1 name]  ·  [Roll number]", size=12.5, align=WD_ALIGN_PARAGRAPH.CENTER)
-para("[Student 2 name]  ·  [Roll number]", size=12.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+para("Dushyant Kumar  ·  23145030", size=12.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+para("Nirmit Patil  ·  23145053", size=12.5, align=WD_ALIGN_PARAGRAPH.CENTER)
 doc.add_paragraph()
 para("Course instructor: [Name]", size=11, color=INK2, align=WD_ALIGN_PARAGRAPH.CENTER)
 para("November 2026", size=11, color=INK2, align=WD_ALIGN_PARAGRAPH.CENTER)

@@ -1,0 +1,5 @@
+policy,avg_irrigation_mm,avg_irrigation_events,avg_wasted_mm,avg_stress_days,avg_relative_yield_pct,water_productivity_kg_per_m3
+Q-learning agent (RL),434.83,13.77,1.55,12.42,98.12,6.3
+Sensor threshold rule,459.96,11.37,4.17,0.0,100.0,6.13
+Fixed schedule,784.0,19.6,354.02,15.52,93.7,3.33
+Rainfed (no irrigation),0.0,0.0,0.0,89.6,31.77,

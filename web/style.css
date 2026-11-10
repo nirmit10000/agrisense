@@ -19,6 +19,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.workbench > *, .stage, .leaf-grid > *, .agent-grid > *, .about-grid > *, .two-col > *, .module-grid > *, .hero > * { min-width: 0; }
 html { scroll-behavior: smooth; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);

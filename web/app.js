@@ -50,6 +50,7 @@
     selectTab(t.dataset.tab || t.dataset.goto);
   });
   window.addEventListener("resize", () => { moveInk(); Object.values(charts).forEach(c => c && c.resize()); });
+  window.addEventListener("hashchange", () => { const t = location.hash.slice(1); if (D && t && t !== state.tab) selectTab(t); });
 
   function chart(id) {
     const el = document.getElementById(id);

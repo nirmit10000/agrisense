@@ -13,7 +13,7 @@ Live site: <https://nirmit10000.github.io/agrisense/>
 > standard, driven by 16 years of real weather from Pune, Jodhpur and Ludhiana. On 60 seasons it never
 > saw, it used **45% less water than a fixed schedule with higher yield (98.1% vs 93.7%)**, and slightly
 > less water than an expert soil-sensor rule. For crop health, a MobileNetV2 CNN trained by transfer
-> learning on PlantVillage recognises 14 maize and tomato leaf classes with **93.7% test accuracy**, and
+> learning on PlantVillage recognises 14 maize and tomato leaf classes with **94.0% test accuracy**, and
 > a heatmap shows where on the leaf it looked. Both run in one website, with the disease model running on
 > the user's own device.
 
@@ -168,8 +168,8 @@ lookup table, so it could even run on a microcontroller.
 ## Leaf disease module
 
 **Leaf numbers to remember** (from `results/leaf_metrics.json`): 14 classes (maize + tomato) ·
-train / val / test images **5,660 / 1,213 / 1,213** · test accuracy **93.7%** · macro F1 **0.937** ·
-input **224** px · head epochs **40** + fine-tune epochs **3** · training ~**11.5** min on CPU ·
+train / val / test images **5,660 / 1,213 / 1,213** · test accuracy **94.0%** · macro F1 **0.940** ·
+input **224** px · head epochs **40** + fine-tune epochs **3** (last 8 blocks) · training ~**15** min on CPU ·
 browser model **8.9 MB** · 28/28 demo samples correct in the browser (~65 ms each).
 
 **Q: Why a CNN for this?**
@@ -208,21 +208,26 @@ if it is on the background, we would know the model is cheating. It's coarse (on
 Validation is for choices during training; the test set is used once, at the end, so the reported
 accuracy is unbiased. Images per class were capped so that no class dominates and training stays fast.
 
-**Q: What does 93.7% accuracy actually mean?**
-Of the 1,213 test leaves the model never saw during training, it named the correct class for 93.7%.
-We also report macro F1 (0.937), which weights every class equally, so a weak rare class can't hide behind
+**Q: What does 94.0% accuracy actually mean?**
+Of the 1,213 test leaves the model never saw during training, it named the correct class for 94.0%.
+We also report macro F1 (0.940), which weights every class equally, so a weak rare class can't hide behind
 the big ones. The per-class table and confusion matrix show which diseases get confused (typically
 diseases with similar-looking spots on the same crop).
 
 **Q: Which classes are weakest, and why?**
-Three tomato diseases: Spider mites (F1 0.85, recall 73%), Early blight (F1 0.86, recall 79%) and
-Target spot (F1 0.86, precision 77%). Spider mites and Early blight are mostly mistaken for Target spot:
-all three show small dark or speckled spots on the leaf. Maize classes are much easier.
+Spider mites (tomato; F1 0.81, recall 68%), Target spot (tomato; F1 0.84, precision 73%) and Gray leaf
+spot (maize; F1 0.87, recall 81%). Spider mites' low recall together with Target spot's low precision
+shows that missed Spider-mite leaves are mostly called Target spot: both show small speckled spots. In
+maize, Gray leaf spot is sometimes called Northern leaf blight: both form long grey-tan lesions. The
+confusion matrix shows exactly where.
 
-**Q: Published PlantVillage models get 99%. Why only 93.7%?**
-We trained for 11.5 minutes on a laptop CPU, fine-tuning only the last 4 blocks for 3 epochs. Fine-tuning
-the whole network for more epochs on a GPU is the obvious next step and would close most of the gap. We
-chose a small model that runs on a phone over a big one.
+**Q: Published PlantVillage models get 99%. Why only 94.0%?**
+We trained for about 15 minutes on a laptop CPU: the classifier head first, then the last 8
+of MobileNetV2's 19 feature blocks for 3 epochs, on a capped sample of 8,086 images. A first run
+(last 4 blocks) reached 93.7% test accuracy. Fine-tuning 8 blocks lifted validation accuracy from 92.8% to
+94.6% (test 94.0%), and it was still rising when our time box stopped it. Fine-tuning the whole
+network on all PlantVillage images with a GPU would close most of the gap. We chose a small model that
+runs on a phone over a big one.
 
 **Q: Would it work on photos from a real field?**
 Not as well, and we say so. PlantVillage photos are single leaves on a plain background in good light.

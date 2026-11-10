@@ -28,6 +28,7 @@
     ink.style.transform = `translateX(${btn.offsetLeft}px)`;
   }
   function selectTab(name) {
+    name = { agent: "irrigation", results: "irrigation", about: "overview" }[name] || name;   // old links
     if (!$(`[data-panel="${name}"]`)) name = "overview";
     state.tab = name;
     $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -36,10 +37,8 @@
     if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
     window.scrollTo({ top: 0, behavior: "smooth" });
     requestAnimationFrame(() => {
-      if (name === "irrigation") renderIrrigation();
-      if (name === "agent") renderAgent();
-      if (name === "results") renderResults();
-      if (name === "leaf") initLeaf();
+      if (name === "irrigation") { renderIrrigation(); renderAgent(); renderResults(); }
+      if (name === "leaf") { initLeaf(); renderLeafResults(); }
       Object.values(charts).forEach(c => c && c.resize());
     });
   }
@@ -294,14 +293,13 @@
         itemStyle: { color: COLORS[p], borderRadius: [5, 5, 0, 0] },
         data: cities.map(c => D.summary.by_city.find(r => r.city === c && r.policy === p).water) })),
     });
-    renderLeafResults();
   }
   function renderLeafResults() {
     const box = $("#leaf-results");
     if (!leafMeta) { box.querySelector("#leaf-kpis").innerHTML = `<p class="sub">Leaf model metrics not available yet.</p>`; return; }
     $("#leaf-kpis").innerHTML = [
       [`${fmt(100 * leafMeta.test_accuracy, 1)}%`, "test accuracy"], [fmt(leafMeta.macro_f1, 3), "macro F1"],
-      [leafMeta.n_images ? leafMeta.n_images.test : "—", "held-out test images"], [`${fmt(leafMeta.model_size_mb, 1)} MB`, "model size (runs on-device)"],
+      [leafMeta.n_images ? leafMeta.n_images.test : "—", "held-out test images"], [leafMeta.classes ? leafMeta.classes.length : 14, "classes"],
     ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
     if (leafMeta.per_class) {
       $("#leaf-table").innerHTML = `<thead><tr><th>Crop</th><th>Class</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th><th class="num">Test images</th></tr></thead><tbody>` +
@@ -341,13 +339,13 @@
     if (leafSession) return Promise.resolve(leafSession);
     if (leafLoading) return leafLoading;
     const st = $("#model-status");
-    st.textContent = "Loading the neural network (runs on this device)…";
+    st.textContent = "Loading the model…";
     ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
     ort.env.wasm.numThreads = 1;
     leafLoading = ort.InferenceSession.create("web/models/leaf.onnx", { executionProviders: ["wasm"] })
       .then(s => {
         leafSession = s;
-        st.textContent = `Model ready: MobileNetV2, ${leafClasses.length} classes${leafMeta ? `, ${fmt(leafMeta.model_size_mb, 1)} MB` : ""}. Nothing is uploaded.`;
+        st.textContent = `Model ready: MobileNetV2, ${leafClasses.length} classes.`;
         return s;
       })
       .catch(err => { st.textContent = "Could not load the model: " + err.message; leafLoading = null; throw err; });
@@ -394,7 +392,7 @@
       const c = leafClasses[i];
       return `<div class="pred ${k === 0 ? "top" : ""}"><span class="name">${c.name} <small>· ${c.crop}</small></span>
         <span class="pct">${fmt(100 * p, 1)}%</span><span class="bar"><i data-w="${100 * p}"></i></span></div>`;
-    }).join("") + `<p class="sub">${trueLabel ? `True label: <b>${trueLabel}</b> · ` : ""}inference ${fmt(ms)} ms on this device</p>`;
+    }).join("") + `<p class="sub">${trueLabel ? `True label: <b>${trueLabel}</b> · ` : ""}inference ${fmt(ms)} ms</p>`;
     requestAnimationFrame(() => $$(".pred .bar i").forEach(i => { i.style.width = i.dataset.w + "%"; }));
     const tc = leafClasses[top], adv = $("#advice");
     adv.hidden = false;

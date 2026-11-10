@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AgriSense</title>
-  <meta name="description" content="AI for water-smart, disease-aware farming: a reinforcement-learning irrigation agent and an on-device leaf disease detector.">
+  <meta name="description" content="A reinforcement-learning irrigation agent and a CNN leaf disease detector.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
@@ -21,9 +21,6 @@
     <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button role="tab" data-tab="irrigation">Smart irrigation</button>
     <button role="tab" data-tab="leaf">Leaf doctor</button>
-    <button role="tab" data-tab="agent">Inside the agent</button>
-    <button role="tab" data-tab="results">Results</button>
-    <button role="tab" data-tab="about">How it works</button>
     <span class="tab-ink" aria-hidden="true"></span>
   </nav>
 </header>
@@ -33,10 +30,10 @@
 <section class="panel" id="tab-overview" data-panel="overview">
   <div class="hero">
     <div class="hero-text">
-      <p class="eyebrow">EC-422 Artificial Intelligence · Agriculture</p>
+      <p class="eyebrow">Smart irrigation · Crop health</p>
       <h1>AI for water-smart,<br>disease-aware farming</h1>
       <p class="lede">Two AI modules for the two everyday questions on a farm: <strong>how much should I water today?</strong>
-        and <strong>what is wrong with this leaf?</strong> Everything runs in your browser.</p>
+        and <strong>what is wrong with this leaf?</strong></p>
       <div class="hero-cta">
         <button class="btn primary" data-goto="irrigation">Try the irrigation agent</button>
         <button class="btn" data-goto="leaf">Diagnose a leaf</button>
@@ -72,8 +69,8 @@
     <article class="module-card" data-goto="irrigation">
       <div class="module-icon water">💧</div>
       <h2>Smart irrigation <span class="tag">Reinforcement learning</span></h2>
-      <p>A Q-learning agent learned, by practising on 50,000 simulated seasons driven by real weather from
-        three Indian climates, when and how much to water.</p>
+      <p>A Q-learning agent learned when and how much to water by practising on 50,000 simulated seasons,
+        driven by real weather from three Indian climates.</p>
       <div class="stat-row">
         <div><b id="ov-save">45%</b><span>less water than a fixed schedule</span></div>
         <div><b id="ov-yield">98.1%</b><span>of maximum yield kept</span></div>
@@ -82,8 +79,8 @@
     <article class="module-card" data-goto="leaf">
       <div class="module-icon leaf">🌿</div>
       <h2>Leaf doctor <span class="tag">Deep learning (CNN)</span></h2>
-      <p>A MobileNetV2 convolutional network, fine-tuned on PlantVillage maize and tomato leaves, names the
-        disease and shows where on the leaf it looked.</p>
+      <p>A MobileNetV2 convolutional network, fine-tuned on maize and tomato leaves from PlantVillage, names the
+        disease and highlights the part of the leaf that drove the decision.</p>
       <div class="stat-row">
         <div><b id="ov-acc">—</b><span>test accuracy</span></div>
         <div><b id="ov-classes">14</b><span>maize &amp; tomato classes</span></div>
@@ -91,14 +88,41 @@
     </article>
   </div>
 
-  <div class="flow card">
-    <h3>How the pieces fit together</h3>
-    <ol class="flow-steps">
-      <li><b>Data</b><span>Open-Meteo weather 2010–2025 · PlantVillage leaf photos</span></li>
-      <li><b>Train in Python</b><span>FAO-56 simulator + Q-learning · MobileNetV2 transfer learning</span></li>
-      <li><b>Export</b><span>Q-tables &amp; seasons as JSON · CNN as ONNX</span></li>
-      <li><b>Run in the browser</b><span>This page, on GitHub Pages. Photos never leave your device.</span></li>
-    </ol>
+  <div class="card">
+    <h3>Module 1 · How the irrigation agent learns and decides</h3>
+    <div class="flowchart">
+      <div class="fnode data"><b>Weather data</b><span>Open-Meteo, 2010–2025<br>Pune · Jodhpur · Ludhiana</span></div>
+      <div class="farrow"></div>
+      <div class="fnode sim"><b>Field simulator</b><span>FAO-56 soil-water balance<br>crop water use, drainage, stress</span></div>
+      <div class="farrow both" title="state and reward ↔ action"></div>
+      <div class="fnode model"><b>Q-learning agent</b><span>50,000 practice seasons<br>ε-greedy exploration</span></div>
+      <div class="farrow"></div>
+      <div class="fnode out"><b>Q-table</b><span>360 situations × 5 actions<br>= the learned rulebook</span></div>
+      <div class="farrow"></div>
+      <div class="fnode out dark"><b>Daily decision</b><span>irrigate 0 / 10 / 20 / 30 / 40 mm</span></div>
+    </div>
+    <div class="flow-legend">
+      <span><i class="k-state"></i>State: soil dryness · crop stage · 3-day rain forecast · evaporative demand</span>
+      <span><i class="k-reward"></i>Reward: −(water + 10 × crop water shortage + drained water + cost per irrigation)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Module 2 · How a leaf photo becomes a diagnosis</h3>
+    <div class="flowchart">
+      <div class="fnode data"><b>Leaf photo</b><span>camera or upload</span></div>
+      <div class="farrow"></div>
+      <div class="fnode sim"><b>Pre-process</b><span>resize, centre-crop 224 × 224<br>ImageNet normalisation</span></div>
+      <div class="farrow"></div>
+      <div class="fnode model"><b>MobileNetV2</b><span>ImageNet-pretrained, fine-tuned<br>7 × 7 × 1280 feature maps</span></div>
+      <div class="farrow"></div>
+      <div class="fnode model"><b>Pool + classifier</b><span>global average pool<br>linear layer → 14 classes</span></div>
+      <div class="farrow"></div>
+      <div class="fnode out dark"><b>Diagnosis</b><span>top-3 classes + confidence<br>heatmap + advice</span></div>
+    </div>
+    <div class="flow-legend">
+      <span><i class="k-reward"></i>Heatmap (class activation map) = classifier weights × the 7 × 7 feature maps</span>
+    </div>
   </div>
 </section>
 
@@ -115,7 +139,7 @@
         <div class="city-cards" id="city-cards"></div>
       </div>
       <div class="control">
-        <label for="season-sel">Sowing season</label>
+        <label>Sowing season</label>
         <div class="seg" id="season-seg"></div>
       </div>
       <div class="control">
@@ -127,7 +151,7 @@
         <label>Show policies</label>
         <div class="chips" id="policy-chips"></div>
       </div>
-      <p class="hint">Years 2021–2024 were never seen during training.</p>
+      <p class="hint">2021–2024 were never seen during training.</p>
     </aside>
 
     <div class="stage">
@@ -144,6 +168,49 @@
         <div class="table-wrap"><table class="data" id="season-table"></table></div>
       </div>
     </div>
+  </div>
+
+  <div class="agent-grid">
+    <div class="card">
+      <div class="card-head">
+        <h3>The learned rulebook</h3>
+        <div class="seg small" id="rb-crop"></div>
+      </div>
+      <p class="sub">Each cell is the irrigation the agent chooses in that situation.
+        <span class="rare-key">rare</span> = seen fewer than 50 times in training.</p>
+      <div class="rb-controls">
+        <div><label>Crop stage</label><div class="seg small" id="rb-stage"></div></div>
+        <div><label>Evaporative demand (ET0)</label><div class="seg small" id="rb-et0"></div></div>
+      </div>
+      <div class="rulebook" id="rulebook"></div>
+    </div>
+    <div class="side-stack">
+      <div class="card">
+        <h3>What it worked out on its own</h3>
+        <ol class="rules">
+          <li>Wait until about <b>60%</b> of the soil water is used (the FAO-56 rule is 55%).</li>
+          <li>Dry soil and no rain coming: give the <b>full 40 mm</b>.</li>
+          <li>Heavy rain in the forecast: irrigate <b>less or not at all</b>.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Learning curve</h3>
+        <div id="chart-training" class="chart short"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Test results: <span id="n-test">60</span> unseen seasons (2021–2024)</h3>
+    <div class="two-col">
+      <div id="chart-water" class="chart"></div>
+      <div id="chart-yield" class="chart"></div>
+    </div>
+    <div class="table-wrap"><table class="data" id="summary-table"></table></div>
+  </div>
+  <div class="card">
+    <h3>Water per season, by city (average over all crops)</h3>
+    <div id="chart-city" class="chart"></div>
   </div>
 </section>
 
@@ -168,10 +235,10 @@
         <div class="viewer">
           <canvas id="leaf-canvas" width="224" height="224"></canvas>
           <canvas id="cam-canvas" width="224" height="224"></canvas>
-          <div class="viewer-empty" id="viewer-empty">Your photo appears here</div>
+          <div class="viewer-empty" id="viewer-empty">Choose a photo</div>
         </div>
         <div class="cam-controls">
-          <label class="switch"><input type="checkbox" id="cam-toggle" checked><span></span> Show heatmap (where the model looked)</label>
+          <label class="switch"><input type="checkbox" id="cam-toggle" checked><span></span> Heatmap</label>
           <input type="range" id="cam-alpha" min="0" max="100" value="55" aria-label="Heatmap opacity">
         </div>
         <div id="predictions" class="predictions"></div>
@@ -179,106 +246,18 @@
       </div>
     </div>
   </div>
-  <p class="disclaimer">Trained on PlantVillage photos (single leaves on plain backgrounds). Field photos with clutter
-    may be less accurate. This is a decision-support demo, not an agronomist: confirm with your local
-    Krishi Vigyan Kendra before using any chemical.</p>
-</section>
 
-<!-- ============================================================ AGENT -->
-<section class="panel" id="tab-agent" data-panel="agent" hidden>
-  <div class="agent-grid">
-    <div class="card">
-      <div class="card-head">
-        <h3>The learned rulebook</h3>
-        <div class="seg small" id="rb-crop"></div>
-      </div>
-      <p class="sub">The agent's whole “brain” is a 360-row table. Each cell is the irrigation it chooses for that
-        situation. <span class="rare-key">rare</span> = seen fewer than 50 times in training.</p>
-      <div class="rb-controls">
-        <div><label>Crop stage</label><div class="seg small" id="rb-stage"></div></div>
-        <div><label>Today's evaporative demand (ET0)</label><div class="seg small" id="rb-et0"></div></div>
-      </div>
-      <div class="rulebook" id="rulebook"></div>
-    </div>
-    <div class="side-stack">
-      <div class="card">
-        <h3>What it figured out on its own</h3>
-        <ol class="rules">
-          <li>Wait until about <b>60%</b> of the soil water is used. The FAO-56 rule says 55%, and nobody told it.</li>
-          <li>Dry soil and no rain coming: give the <b>full 40 mm</b>.</li>
-          <li>Heavy rain in the forecast: irrigate <b>less or not at all</b>.</li>
-        </ol>
-      </div>
-      <div class="card">
-        <h3>Learning curve</h3>
-        <div id="chart-training" class="chart short"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================ RESULTS -->
-<section class="panel" id="tab-results" data-panel="results" hidden>
-  <div class="card">
-    <h3>Irrigation: <span id="n-test">60</span> unseen test seasons (2021–2024)</h3>
-    <div class="two-col">
-      <div id="chart-water" class="chart"></div>
-      <div id="chart-yield" class="chart"></div>
-    </div>
-    <div class="table-wrap"><table class="data" id="summary-table"></table></div>
-  </div>
-  <div class="card">
-    <h3>Water per season, by city (average over all crops)</h3>
-    <div id="chart-city" class="chart"></div>
-  </div>
   <div class="card" id="leaf-results">
-    <h3>Leaf doctor: held-out test images</h3>
+    <h3>Test results: held-out leaf images</h3>
     <div class="leaf-kpis" id="leaf-kpis"></div>
     <div class="two-col">
-      <figure><img src="results/fig_leaf_confusion.png" alt="Confusion matrix of the leaf classifier" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Confusion matrix (rows: true class)</figcaption></figure>
-      <figure><img src="results/fig_leaf_cam_examples.png" alt="Class activation heatmap examples" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Heatmaps: where the network looked</figcaption></figure>
+      <figure><img src="results/fig_leaf_confusion.png" alt="Confusion matrix of the leaf classifier" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Confusion matrix: rows are the true class, columns the prediction; the diagonal is correct.</figcaption></figure>
+      <figure><img src="results/fig_leaf_cam_examples.png" alt="Class activation heatmap examples" loading="lazy" onerror="this.closest('figure').hidden=true"><figcaption>Heatmaps: the highlighted regions drove each prediction.</figcaption></figure>
     </div>
     <div class="table-wrap"><table class="data" id="leaf-table"></table></div>
   </div>
 </section>
-
-<!-- ============================================================ ABOUT -->
-<section class="panel" id="tab-about" data-panel="about" hidden>
-  <div class="about-grid">
-    <div class="card">
-      <h3>Module 1 · Reinforcement learning for irrigation</h3>
-      <dl class="mdp">
-        <dt>Environment</dt><dd>Daily FAO-56 soil-water balance driven by real weather (Pune, Jodhpur, Ludhiana, 2010–2025); FAO-33 yield.</dd>
-        <dt>State</dt><dd>Soil dryness (10) × crop stage (4) × 3-day rain forecast (3) × ET0 (3) = <b>360 states</b>.</dd>
-        <dt>Actions</dt><dd>Irrigate 0 / 10 / 20 / 30 / 40 mm today.</dd>
-        <dt>Reward</dt><dd>−(water + 10 × crop water shortage + water drained + 10 per irrigation event).</dd>
-        <dt>Algorithm</dt><dd>Tabular Q-learning, ε 1→0.05, α 0.1→0.01, γ 0.95, 50,000 seasons per crop.</dd>
-        <dt>Baselines</dt><dd>Rainfed · fixed 40 mm every 7 days · FAO soil-sensor threshold rule.</dd>
-      </dl>
-    </div>
-    <div class="card">
-      <h3>Module 2 · Deep learning for leaf disease</h3>
-      <dl class="mdp">
-        <dt>Data</dt><dd>PlantVillage colour images, maize + tomato, 14 classes, 70/15/15 split.</dd>
-        <dt>Model</dt><dd>MobileNetV2 pretrained on ImageNet → global average pool → linear classifier (transfer learning).</dd>
-        <dt>Explainability</dt><dd>Class activation map: classifier weights × last convolutional feature maps.</dd>
-        <dt>Deployment</dt><dd>Exported to ONNX and run on your device with ONNX Runtime Web. No server, no upload.</dd>
-      </dl>
-    </div>
-    <div class="card">
-      <h3>Documents &amp; code</h3>
-      <ul class="links">
-        <li><a href="docs/AgriSense_Report.docx">Project report (.docx)</a></li>
-        <li><a href="docs/AgriSense_Presentation.pptx">Presentation (.pptx)</a></li>
-        <li><a href="https://github.com/nirmit10000/agrisense">Source code on GitHub</a></li>
-      </ul>
-      <p class="sub">EC-422 Artificial Intelligence course project.</p>
-    </div>
-  </div>
-</section>
 </main>
-
-<footer class="foot">AgriSense · EC-422 Artificial Intelligence · weather: Open-Meteo (ERA5) · leaves: PlantVillage</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>

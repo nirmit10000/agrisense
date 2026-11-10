@@ -66,6 +66,7 @@ leaf_input = lv(lambda m: m["input_size"])
 leaf_grid = lv(lambda m: int(m["input_size"]) // 32)  # MobileNetV2 downsamples by 32
 leaf_ep_head = lv(lambda m: m["epochs"]["head"])
 leaf_ep_ft = lv(lambda m: m["epochs"]["finetune"])
+leaf_ft_blocks = lv(lambda m: m.get("finetune_blocks", 4))
 leaf_minutes = lv(lambda m: m["train_minutes"], "{:.0f}")
 leaf_size = lv(lambda m: m["model_size_mb"], "{:.1f} MB")
 leaf_model_file = lv(lambda m: m["model_file"])
@@ -445,7 +446,7 @@ lud = by_city.loc[("Ludhiana", RL)]
 para(f"The agent's behaviour differs by climate. In arid Jodhpur it matches the threshold rule almost exactly "
      f"(little rain to exploit). In Ludhiana it saves the most water but loses the most yield "
      f"({100 * lud.y:.1f}%). A likely cause is the long cold-winter periods of very low ET0, where the coarse "
-     f"discrete state loses detail and the agent sometimes waits too long (Section 8).")
+     f"discrete state loses detail and the agent sometimes waits too long (Section 9).")
 
 doc.add_heading("5.4 One season, day by day", 2)
 figure(RES / "fig_season_trace.png", "Figure 5. Maize, Jodhpur, Kharif 2023. Both policies keep the soil above "
@@ -500,9 +501,9 @@ bullets([
     ("Stage 1, linear head: ", f"the pre-trained convolutional layers are frozen and only the new "
      f"classifier is trained ({leaf_ep_head} epochs). The network already 'sees' edges, colours and textures; "
      f"this stage learns which of those features indicate which disease."),
-    ("Stage 2, fine-tuning: ", f"the last convolutional blocks are unfrozen and trained together with the "
-     f"head at a small learning rate ({leaf_ep_ft} epochs), so the high-level features adapt to leaf "
-     f"lesions rather than everyday objects."),
+    ("Stage 2, fine-tuning: ", f"the last {leaf_ft_blocks} of MobileNetV2's 19 feature blocks are unfrozen and "
+     f"trained together with the head at a small learning rate ({leaf_ep_ft} epochs), so the high-level features "
+     f"adapt to leaf lesions rather than everyday objects."),
 ])
 para(f"Training took about {leaf_minutes} minutes on a laptop CPU. The final model was exported to the ONNX "
      f"format ({leaf_model_file}, {leaf_size}) so that it can run in a web browser.")
@@ -545,61 +546,114 @@ figure(RES / "fig_leaf_cam_examples.png", "Figure 8. Class activation maps for t
 # ------------------------------------------------------------------ 7 website
 doc.add_heading("7. Deployment: the AgriSense website", 1)
 para(f"Both modules are deployed together as a public website: {SITE_URL}. It is a static site hosted free "
-     f"on GitHub Pages. There is no server: everything is plain HTML, CSS and JavaScript that runs in the "
-     f"visitor's browser. This makes the site free to host, fast, and private.")
-table(["Part", "How it works", "Why"], [
-    ["Irrigation simulator", "Every season (all cities, crops, sowing seasons, years and the 4 policies) is "
-     "simulated in Python and shipped as JSON; the browser only draws the charts",
-     "Identical numbers to this report; instant response; no Python needed online"],
-    ["Agent rulebook", "The trained Q-tables are exported as JSON and shown as an interactive table",
-     "The learned policy can be inspected on the site"],
-    ["Leaf Doctor", f"The CNN is exported to ONNX ({leaf_size}) and executed by ONNX Runtime Web "
-     "(WebAssembly) on the user's device; top-3 diagnoses, advice and a CAM heatmap are computed in the browser",
-     "Photos never leave the device; works without a GPU or a server"],
-    ["Local dashboard", "The Streamlit app (app.py) is kept for local use and live re-simulation",
-     "Useful for development and experiments"],
-], [3.0, 8.0, 5.4], bold_first_col=True)
-para("The code is modular: the irrigation package (agrisense/), the leaf-disease training code (leaf/) and "
-     "the website (index.html and web/) are separate, so a new crop, city, disease class or agent can be "
-     "added without touching the rest.")
+     f"on GitHub Pages: plain HTML, CSS and JavaScript that runs in the visitor's browser, with no server. "
+     f"The site has three tabs:")
+table(["Tab", "What it shows", "How it works"], [
+    ["Overview", "The problem, the two modules and flowcharts of how data, training and the website connect",
+     "Static page"],
+    ["Smart irrigation", "Season simulator (crop, city, sowing season, year, which policies to plot), the "
+     "learned rulebook for any crop stage and weather, and the results on the 60 unseen test seasons",
+     "Every season (all cities, crops, sowing seasons, years and the 4 policies) is simulated in Python with the "
+     "trained Q-tables and shipped as JSON, so the site shows exactly the numbers in this report"],
+    ["Leaf doctor", "Upload or photograph a leaf (or pick a test sample): top-3 diagnoses with confidence, a "
+     "class activation heatmap and management advice, followed by the test-set results",
+     "The CNN is exported to ONNX and run by ONNX Runtime Web (WebAssembly) on the user's device; the photo is "
+     "never uploaded"],
+], [3.0, 7.0, 6.4], bold_first_col=True)
+para("A Streamlit dashboard (app.py) is also kept in the repository for local experiments. The code is modular: "
+     "the irrigation package (agrisense/), the leaf-disease training code (leaf/) and the website (index.html "
+     "and web/) are separate, so a new crop, city, disease class or agent can be added without touching the rest.")
 
-# ------------------------------------------------------------------ 8 limitations
-doc.add_heading("8. Limitations and future work", 1)
-doc.add_heading("8.1 Irrigation module", 2)
+# ------------------------------------------------------------------ 8 challenges
+doc.add_heading("8. Challenges and how we solved them", 1)
+para("The main practical problems we hit while building AgriSense, and what we did about each:").paragraph_format.keep_with_next = True
+if leaf_ft_blocks not in (PENDING, "4"):
+    leaf_second_run = (f"a second run fine-tuned the last {leaf_ft_blocks} blocks for {leaf_ep_ft} epochs "
+                       f"(about {leaf_minutes} min) and reached {leaf_acc}")
+else:
+    leaf_second_run = f"the final model reached {leaf_acc}"
+table(["Challenge", "Impact", "Solution"], [
+    ["Disk full (45 MB free on C:)", "Training stopped while saving results",
+     "Cleared the pip package cache (~3 GB) and kept training logs compact (one row per 100 episodes)"],
+    ["Slow pure-Python training loop", "No progress after 10 minutes",
+     "Pre-computed rain-forecast windows and dates as NumPy arrays and replaced np.digitize / pandas look-ups "
+     "with plain arithmetic: 50,000 seasons now train in ~1.5 min per crop"],
+    ["Agent irrigated too often", "~21 small irrigations per season (impractical for a farmer)",
+     "Added a fixed cost per irrigation event to the reward: events fell to ~12-14 per season without losing yield"],
+    ["Noisy learned policy", "Rulebook looked inconsistent and was hard to explain",
+     "Decayed the learning rate α from 0.1 to 0.01 so Q-values settle, and marked states seen fewer than 50 "
+     "times as 'rare' instead of trusting them"],
+    ["Streamlit cannot run on GitHub Pages", "No free, always-on public link",
+     "Pre-computed all 225 irrigation seasons to JSON in Python and ran the CNN in the browser with ONNX "
+     "Runtime Web"],
+    ["No usable GPU", "CPU-only PyTorch; the GPU build (~2.5 GB) would take ~3 h to download at ~0.24 MB/s",
+     "Transfer learning on the CPU: cached frozen features to train the classifier head, capped 600 images per "
+     f"class, then time-boxed fine-tuning. A first run (last 4 blocks, 3 epochs) reached 93.7%; {leaf_second_run}"],
+    ["Browser vs training mismatch risk", "Different preprocessing would silently lower accuracy online",
+     "One fixed preprocessing contract (resize short side to 256, centre-crop 224, ImageNet normalisation); "
+     "ONNX outputs checked against PyTorch (max difference ~2e-4); all 28 demo leaves tested in the browser "
+     "(all correct)"],
+    ["Website overflowed on phones", "Pages scrolled sideways on a 390 px screen",
+     "Fixed the CSS grid sizing: every page now fits a phone screen"],
+], [3.6, 4.2, 8.6], bold_first_col=True)
+
+# ------------------------------------------------------------------ 9 limitations
+doc.add_heading("9. Limitations", 1)
+doc.add_heading("9.1 Irrigation module", 2)
 bullets([
     ("Simulated field. ", "Results come from an FAO-56 model, not a physical field trial; real soils vary "
      "within a field and sensors are noisy."),
     ("Simple yield model. ", "The seasonal FAO-33 equation ignores that stress at flowering hurts more than "
-     "at other stages. A crop model such as AquaCrop would capture this."),
+     "at other stages."),
     ("Forecast. ", "The forecast is synthetic (true rain ± 25% error); real forecast archives would be more "
      "realistic."),
-    ("Coarse state. ", "Ten dryness levels and three weather levels lose detail (e.g. Ludhiana winters). "
-     "A Deep Q-Network over continuous inputs could remove this limit; the environment already "
-     "supports it."),
+    ("Coarse state. ", "Ten dryness levels and three weather levels lose detail (e.g. Ludhiana winters)."),
     ("One soil. ", "Only sandy loam was trained; other soils would need retraining or soil as a state feature."),
 ])
-doc.add_heading("8.2 Leaf disease module", 2)
+doc.add_heading("9.2 Leaf disease module", 2)
 bullets([
     ("Laboratory images. ", "PlantVillage photos show a single leaf on a plain background in good light. "
      "Real field photos (several leaves, soil, shadows, other symptoms) are harder, and accuracy on them "
      "will be lower than the test accuracy reported here."),
     ("Closed set of classes. ", f"The model only knows {leaf_n_classes} {leaf_crops} classes. Any other "
-     "image, even a non-leaf, is forced into one of them; an 'unknown' or confidence-threshold option is "
-     "needed in practice. Wheat, the third irrigation crop, is not in PlantVillage."),
+     "image, even a non-leaf, is forced into one of them. Wheat, the third irrigation crop, is not in "
+     "PlantVillage."),
     ("Coarse heatmaps. ", f"The CAM comes from the last feature grid ({leaf_grid} × {leaf_grid} cells), so it "
      "locates regions, not individual spots."),
-    ("Next steps. ", "Fine-tune on field datasets such as PlantDoc, add stronger augmentation (backgrounds, "
-     "lighting), add out-of-distribution rejection, and add more crops."),
-])
-doc.add_heading("8.3 System", 2)
-bullets([
-    "Connect the two modules: a detected disease could change the irrigation advice (for example, avoiding "
-    "overhead watering when fungal blight is present).",
-    "Feed real soil-moisture sensors and live forecasts into the irrigation agent for a field deployment.",
+    ("Limited compute. ", "Only part of the network was fine-tuned, on a capped sample of images, on a CPU."),
 ])
 
-# ------------------------------------------------------------------ 9 conclusion
-doc.add_heading("9. Conclusion", 1)
+# ------------------------------------------------------------------ 10 future scope
+doc.add_heading("10. Future scope", 1)
+doc.add_heading("10.1 Irrigation module", 2)
+bullets([
+    ("Deep Q-Network. ", "Replace the 360-state table with a DQN on continuous inputs; the environment "
+     "already returns continuous observations."),
+    ("Real sensors and live forecasts. ", "Feed IoT soil-moisture sensors and a live weather forecast into the "
+     "agent to give a farmer a daily irrigation recommendation."),
+    ("Soil and crop as inputs. ", "Add soil type and crop to the state so one agent serves every field."),
+    ("Stage-sensitive yield model. ", "Use a crop model such as AquaCrop so stress at flowering counts more."),
+])
+doc.add_heading("10.2 Leaf disease module", 2)
+bullets([
+    ("Full fine-tuning on a GPU. ", "Fine-tune the whole network on all PlantVillage images, which should "
+     "approach the ~99% reported in the literature."),
+    ("Field photos. ", "Fine-tune on field datasets such as PlantDoc, with augmentation for backgrounds and "
+     "lighting."),
+    ("'Unknown' option. ", "Reject images that are not a known leaf using a confidence threshold or "
+     "out-of-distribution detection."),
+    ("More crops. ", "Add more crops, including wheat, from other datasets or locally collected images."),
+])
+doc.add_heading("10.3 System", 2)
+bullets([
+    ("Link the modules. ", "A detected disease could adjust the irrigation plan, for example avoiding overhead "
+     "watering when a fungal blight is present."),
+    ("Regional languages. ", "Hindi, Marathi, Punjabi and other language versions of the website."),
+    ("Offline app. ", "Package the site as an installable app that works without a connection in the field."),
+])
+
+# ------------------------------------------------------------------ 11 conclusion
+doc.add_heading("11. Conclusion", 1)
 para(f"AgriSense applies two complementary AI techniques to one farmer's two biggest day-to-day questions: "
      f"when to water, and what is wrong with the crop. A simple, fully interpretable reinforcement learning "
      f"agent learned an irrigation policy from experience alone. On {n_test} unseen seasons across three very "

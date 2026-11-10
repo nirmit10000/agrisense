@@ -230,3 +230,35 @@ input[type=range] { width: 100%; accent-color: var(--green); }
   .chart.tall { height: 420px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------------------------------------------------------------- flowcharts (overview) */
+.flowchart { display: flex; align-items: stretch; margin: 14px 0 12px; }
+.fnode { flex: 1 1 0; min-width: 0; border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 4px; animation: nodeIn .5s var(--ease) both; }
+.fnode b { color: var(--green-dk); font-size: .92rem; }
+.fnode span { color: var(--ink-2); font-size: .78rem; line-height: 1.4; }
+.fnode.data { background: #E8F1FC; border-color: #CFE0F6; }
+.fnode.sim { background: var(--tint-2); }
+.fnode.model { background: var(--tint); border-color: #D3E3CC; }
+.fnode.out { background: #fff; border-color: var(--green); }
+.fnode.dark { background: var(--green-dk); border-color: var(--green-dk); }
+.fnode.dark b { color: #fff; } .fnode.dark span { color: #CFE3C4; }
+.flowchart > :nth-child(3) { animation-delay: .08s; } .flowchart > :nth-child(5) { animation-delay: .16s; }
+.flowchart > :nth-child(7) { animation-delay: .24s; } .flowchart > :nth-child(9) { animation-delay: .32s; }
+@keyframes nodeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.farrow { flex: 0 0 30px; position: relative; }
+.farrow::before { content: ""; position: absolute; left: 4px; right: 8px; top: 50%; height: 2px; background: #9AA59D; }
+.farrow::after { content: ""; position: absolute; right: 2px; top: calc(50% - 5px); border: 5px solid transparent; border-left: 7px solid #9AA59D; border-right: 0; }
+.farrow.both::before { content: "⇄"; background: none; height: auto; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  text-align: center; color: #7E8A82; font-size: 22px; line-height: 1; }
+.farrow.both::after { display: none; }
+.flow-legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: .8rem; color: var(--ink-2); }
+.flow-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.k-state { background: #CFE0F6; } .k-reward { background: var(--leaf); }
+@media (max-width: 980px) {
+  .flowchart { flex-direction: column; }
+  .farrow { flex-basis: 24px; }
+  .farrow::before { left: 50%; right: auto; top: 3px; bottom: 8px; width: 2px; height: auto; }
+  .farrow::after { left: calc(50% - 5px); right: auto; top: auto; bottom: 1px; border: 5px solid transparent; border-top: 7px solid #9AA59D; border-bottom: 0; }
+  .farrow.both::before { width: auto; left: 0; right: 0; top: 50%; bottom: auto; transform: translateY(-50%) rotate(90deg); }
+}

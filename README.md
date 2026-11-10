@@ -78,9 +78,17 @@ there.
 ## Deployment
 
 The site is served by **GitHub Pages** from this repository: `index.html` at the root, assets in `web/`.
+It has three tabs:
+
+| Tab | What it shows |
+|---|---|
+| **Overview** | The problem, the two modules and flowcharts of how data, training and the website connect |
+| **Smart irrigation** | Season simulator (crop, city, sowing season, year, policies to plot), the learned rulebook, and results on the 60 unseen test seasons |
+| **Leaf doctor** | Upload or photograph a leaf (or pick a test sample): top-3 diagnoses, heatmap and advice, plus the test-set results |
+
 Irrigation simulations for every city, crop, season, year and policy are precomputed in Python and
-shipped as JSON, together with the trained Q-tables. The leaf model is a single ONNX file executed in the
-browser. There is no server, so hosting is free and the link always works.
+shipped as JSON, together with the trained Q-tables. The leaf model is an ONNX file executed in the
+browser with ONNX Runtime Web. There is no server, so hosting is free and the link always works.
 
 ## How the irrigation agent works (one paragraph)
 

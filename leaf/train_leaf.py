@@ -44,7 +44,7 @@ CLASS_INFO = {  # folder name -> (crop, display name, advice)
     "Corn_(maize)___Common_rust_": (
         "Maize", "Common rust",
         "Usually minor on field maize: grow resistant hybrids and sow on time so the crop escapes peak rust "
-        "weather. Confirm with your local Krishi Vigyan Kendra / agriculture officer before using any fungicide."),
+        "weather."),
     "Corn_(maize)___Northern_Leaf_Blight": (
         "Maize", "Northern leaf blight",
         "Use resistant hybrids, rotate crops and bury infected residue after harvest. Confirm with your local "
@@ -66,7 +66,7 @@ CLASS_INFO = {  # folder name -> (crop, display name, advice)
     "Tomato___Late_blight": (
         "Tomato", "Late blight",
         "Spreads fast in cool, wet weather: remove and destroy infected plants promptly and keep foliage dry. "
-        "Confirm urgently with your local Krishi Vigyan Kendra / agriculture officer before using any fungicide."),
+        ""),
     "Tomato___Leaf_Mold": (
         "Tomato", "Leaf mold",
         "Mostly a problem in humid, enclosed conditions: improve ventilation, space plants wider and avoid "
@@ -84,7 +84,7 @@ CLASS_INFO = {  # folder name -> (crop, display name, advice)
     "Tomato___Target_Spot": (
         "Tomato", "Target spot",
         "Improve airflow, remove infected leaves and crop debris, and avoid long periods of leaf wetness. "
-        "Confirm with your local Krishi Vigyan Kendra / agriculture officer before using any fungicide."),
+        ""),
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus": (
         "Tomato", "Yellow leaf curl virus",
         "Spread by whiteflies and cannot be cured: remove infected plants, control whiteflies with yellow "
@@ -214,27 +214,31 @@ def main(data_dir: Path):
 
     # ---- stage 2: fine-tune the last inverted-residual blocks + head (time-boxed)
     budget_s = float(os.environ.get("FT_BUDGET_S", 1200))
+    nb = int(os.environ.get("FT_BLOCKS", 4))          # how many of the last feature blocks to fine-tune
+    max_ep = int(os.environ.get("FT_EPOCHS", 3))
     for p in net.features.parameters():
         p.requires_grad = False
-    trainable = list(net.features[-4:].parameters()) + list(net.head.parameters())
+    trainable = list(net.features[-nb:].parameters()) + list(net.head.parameters())
     for p in trainable:
         p.requires_grad = True
-    ft_opt = torch.optim.Adam([{"params": list(net.features[-4:].parameters()), "lr": 2e-4},
+    ft_opt = torch.optim.Adam([{"params": list(net.features[-nb:].parameters()), "lr": 3e-4},
                                {"params": list(net.head.parameters()), "lr": 5e-4}], weight_decay=1e-4)
+    sched = torch.optim.lr_scheduler.StepLR(ft_opt, step_size=1, gamma=0.6)   # smaller steps each epoch
     rng = random.Random(SEED)
     ft_epochs, t_ft = 0, time.time()
-    for ep in range(3):
+    for ep in range(max_ep):
         net.train()
-        net.features[:-4].eval()   # keep frozen BatchNorm statistics fixed
+        net.features[:-nb].eval()   # keep frozen BatchNorm statistics fixed
         for x, y in batches(split["train"], TRAIN_TF, 32, shuffle=True, rng=rng):
             with torch.no_grad():
-                h = net.features[:-4](x)
-            f = F.adaptive_avg_pool2d(net.features[-4:](h), 1).flatten(1)
+                h = net.features[:-nb](x)
+            f = F.adaptive_avg_pool2d(net.features[-nb:](h), 1).flatten(1)
             loss = F.cross_entropy(net.head(net.dropout(f)), y)
             ft_opt.zero_grad()
             loss.backward()
             ft_opt.step()
         ft_epochs += 1
+        sched.step()
         p_va, y_va = predict(net, split["val"])
         acc = float((p_va.argmax(1) == y_va).mean())
         history.append(dict(stage="finetune", epoch=ep + 1, val_acc=acc))
@@ -293,7 +297,7 @@ def main(data_dir: Path):
         "n_images": {k: len(v) for k, v in split.items()},
         "input_size": 224,
         "preprocess": "resize-short-256, center-crop-224, imagenet-norm",
-        "epochs": {"head": head_epochs, "finetune": ft_epochs},
+        "epochs": {"head": head_epochs, "finetune": ft_epochs}, "finetune_blocks": nb,
         "train_minutes": round(train_minutes, 1),
         "val_accuracy": round(best_acc, 4),
         "test_accuracy": round(test_acc, 4),

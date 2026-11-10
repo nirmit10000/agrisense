@@ -98,33 +98,34 @@
     "head": 40,
     "finetune": 3
   },
-  "train_minutes": 11.5,
-  "val_accuracy": 0.9283,
-  "test_accuracy": 0.9365,
-  "macro_f1": 0.9371,
+  "finetune_blocks": 8,
+  "train_minutes": 14.6,
+  "val_accuracy": 0.9456,
+  "test_accuracy": 0.9398,
+  "macro_f1": 0.9402,
   "per_class": [
     {
       "crop": "Maize",
       "name": "Gray leaf spot",
-      "precision": 0.9467,
-      "recall": 0.9221,
-      "f1": 0.9342,
+      "precision": 0.9538,
+      "recall": 0.8052,
+      "f1": 0.8732,
       "support": 77
     },
     {
       "crop": "Maize",
       "name": "Common rust",
       "precision": 1.0,
-      "recall": 0.9889,
-      "f1": 0.9944,
+      "recall": 0.9778,
+      "f1": 0.9888,
       "support": 90
     },
     {
       "crop": "Maize",
       "name": "Northern leaf blight",
-      "precision": 0.9247,
-      "recall": 0.9556,
-      "f1": 0.9399,
+      "precision": 0.8365,
+      "recall": 0.9667,
+      "f1": 0.8969,
       "support": 90
     },
     {
@@ -138,57 +139,57 @@
     {
       "crop": "Tomato",
       "name": "Bacterial spot",
-      "precision": 0.9167,
-      "recall": 0.9778,
-      "f1": 0.9462,
+      "precision": 0.9368,
+      "recall": 0.9889,
+      "f1": 0.9622,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Early blight",
-      "precision": 0.9467,
-      "recall": 0.7889,
-      "f1": 0.8606,
+      "precision": 0.9884,
+      "recall": 0.9444,
+      "f1": 0.9659,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Late blight",
-      "precision": 0.9111,
-      "recall": 0.9111,
-      "f1": 0.9111,
+      "precision": 0.9551,
+      "recall": 0.9444,
+      "f1": 0.9497,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Leaf mold",
-      "precision": 0.9278,
+      "precision": 0.9677,
       "recall": 1.0,
-      "f1": 0.9626,
+      "f1": 0.9836,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Septoria leaf spot",
-      "precision": 0.9239,
+      "precision": 0.977,
       "recall": 0.9444,
-      "f1": 0.9341,
+      "f1": 0.9605,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Spider mites",
       "precision": 1.0,
-      "recall": 0.7333,
-      "f1": 0.8462,
+      "recall": 0.6778,
+      "f1": 0.8079,
       "support": 90
     },
     {
       "crop": "Tomato",
       "name": "Target spot",
-      "precision": 0.7672,
+      "precision": 0.7295,
       "recall": 0.9889,
-      "f1": 0.8641,
+      "f1": 0.8396,
       "support": 90
     },
     {
@@ -202,17 +203,17 @@
     {
       "crop": "Tomato",
       "name": "Mosaic virus",
-      "precision": 0.9821,
-      "recall": 0.9821,
-      "f1": 0.9821,
+      "precision": 0.9825,
+      "recall": 1.0,
+      "f1": 0.9912,
       "support": 56
     },
     {
       "crop": "Tomato",
       "name": "Healthy",
-      "precision": 0.9667,
-      "recall": 0.9667,
-      "f1": 0.9667,
+      "precision": 0.9773,
+      "recall": 0.9556,
+      "f1": 0.9663,
       "support": 90
     }
   ],

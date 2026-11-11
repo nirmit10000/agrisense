@@ -1,6 +1,7 @@
 """Download and cache daily weather from the free Open-Meteo archive API (no key needed).
 
-Each city is stored as a small CSV in data/ (~300 KB), so the app works offline.
+Each city is stored as a small CSV in data/ (~180 KB), so everything else runs offline.
+The CSVs used for the reported results are included; `python -m agrisense.weather` re-downloads them.
 Columns: date, rain_mm, et0_mm (FAO Penman-Monteith reference ET), tmax_c, tmin_c
 """
 import pandas as pd

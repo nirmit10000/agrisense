@@ -11,6 +11,13 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 MODEL_DIR = ROOT / "models"
 RESULTS_DIR = ROOT / "results"
+WEB_DATA = ROOT / "web" / "data" / "irrigation.json"   # read by the website (index.html)
+
+
+def model_path(crop_name: str) -> Path:
+    """Where the trained Q-table of a crop is saved."""
+    return MODEL_DIR / f"q_{crop_name.lower()}.npz"
+
 
 # --------------------------------------------------------------------------
 # Locations - chosen to give three very different climates (max variance)

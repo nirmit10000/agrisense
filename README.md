@@ -1,153 +1,64 @@
-# AgriSense: AI for Smart Irrigation and Crop Health Monitoring
+# AgriSense: smart irrigation with reinforcement learning
 
-**EC-422 Artificial Intelligence: course project**
-Domain: Agriculture (intelligent irrigation, crop monitoring and resource optimisation)
+**EC-422 Artificial Intelligence, course project.** Dushyant Kumar (23145030), Nirmit Patil (23145053)
+Theme: Agriculture: intelligent irrigation, crop monitoring and resource optimisation.
 
-**Live site: <https://nirmit10000.github.io/agrisense/>**
+- **Website:** <https://nirmit10000.github.io/agrisense/>
+- **Presentation (Canva):** <https://www.canva.com/design/DAHaf0-Y1zI/9xi2UGtj7G3lCuj4Jpl6Uw/view>
+- **Report:** [AgriSense_Report.pdf](AgriSense_Report.pdf)
 
-AgriSense answers a farmer's two everyday questions with two AI techniques:
+A tabular Q-learning agent decides every day how much to irrigate a field (0, 10, 20, 30 or 40 mm).
+It learns by practising 50,000 seasons per crop in a field simulator (FAO-56 soil-water balance) driven by
+real daily weather from three Indian climates (Pune, Jodhpur, Ludhiana). It is trained on seasons from
+2010-2020 and tested on 60 seasons from 2021-2024 that it never saw.
 
-| Module | Question | AI technique |
-|---|---|---|
-| **A. Smart irrigation** | When, and how much, should I water? | Reinforcement learning (tabular Q-learning) |
-| **B. Leaf Doctor** | Is this leaf healthy, and if not, which disease is it? | Deep learning (MobileNetV2 CNN, transfer learning) + class activation maps |
-
-### A. Smart irrigation
-
-A Q-learning agent learns **when and how much to irrigate** a field by practising in a simulated
-field that uses real weather from three Indian climates (Pune, Jodhpur, Ludhiana, 2010-2025).
-On 60 test seasons (2021-2024) it never saw during training, it uses **45% less water than a fixed irrigation
-schedule** and **5.5% less than a soil-moisture sensor rule**, while keeping **98% of maximum
-yield**. It also produces the most crop per cubic metre of water of all the policies.
-
-| Policy (avg over 60 unseen test seasons) | Water / season | Yield (% of max) | Crop per m³ of water |
+| Policy (average of 60 unseen test seasons) | Water per season | Yield (% of max) | Crop per m³ of water |
 |---|---|---|---|
 | **Q-learning agent (RL)** | **435 mm** | 98.1 % | **6.30 kg** |
-| Sensor threshold rule | 460 mm | 100.0 % | 6.13 kg |
-| Fixed schedule (40 mm / 7 days) | 784 mm | 93.7 % | 3.33 kg |
+| Sensor threshold rule (FAO) | 460 mm | 100.0 % | 6.13 kg |
+| Fixed schedule (40 mm every 7 days) | 784 mm | 93.7 % | 3.33 kg |
 | Rainfed (no irrigation) | 0 mm | 31.8 % | - |
 
-### B. Leaf disease detection
+The agent uses 45% less water than the fixed schedule and 5.5% less than the sensor rule. It keeps 98% of
+maximum yield.
 
-A MobileNetV2 convolutional neural network, pre-trained on ImageNet and fine-tuned on the **maize and
-tomato** images of the public PlantVillage dataset (14 classes: healthy plus common diseases), classifies a
-leaf photo and shows a **class activation map**: a heatmap of the leaf regions that drove the decision.
-Test-set accuracy, per-class scores and the confusion matrix are in `results/leaf_metrics.json` and
-`results/fig_leaf_confusion.png`. The model is exported to ONNX and runs **in the browser** with ONNX
-Runtime Web, so photos never leave the user's device.
+## Contents
 
-> PlantVillage photos are single leaves on plain backgrounds; real field photos are harder, and accuracy
-> on them will be lower.
-
----
+| Path | What it is |
+|---|---|
+| `agrisense/config.py` | All settings: cities, crops (FAO-56 values), soil, reward weights, training hyper-parameters, file paths |
+| `agrisense/weather.py` | Downloads the weather dataset from the Open-Meteo archive API (ERA5) |
+| `agrisense/env.py` | The field simulator (the RL environment): daily soil-water balance and FAO-33 yield |
+| `agrisense/agents.py` | The three baseline policies, the state encoder and the Q-learning agent |
+| `agrisense/train.py` | Trains one Q-learning agent per crop |
+| `agrisense/evaluate.py` | Tests all policies on 2021-2024, draws the figures and writes the website data |
+| `data/` | The dataset: daily weather 2010-2025 for the three cities (3 CSV files) |
+| `models/` | The trained Q-tables (one per crop) |
+| `results/` | Test results (CSV) and figures |
+| `index.html`, `web/` | The website (static HTML, CSS and JavaScript, with ECharts for the charts) |
+| `AgriSense_Report.pdf` | Project report |
 
 ## Run it
 
-### The website (both modules)
-
-The site is static (HTML/CSS/JS, no build step). From the repository root:
-
-```bash
-python -m http.server
-```
-
-Then open <http://localhost:8000>. (Opening `index.html` directly from disk will not work, because the
-browser blocks loading the model and JSON files from `file://`.)
-
-### The local Streamlit dashboard (irrigation only)
+Python 3.10 or newer. Run every command from this folder.
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+python -m agrisense.train      # train the 3 agents (about 3.5 min on a laptop CPU) -> models/
+python -m agrisense.evaluate   # test results and figures -> results/, website data -> web/data/irrigation.json
+python -m http.server          # then open http://localhost:8000 to view the website
 ```
 
-The trained agents (`models/`), weather data (`data/`) and results (`results/`) are included, so
-it runs immediately and needs no internet.
+The trained models, results and website data are already included, so you can skip straight to the last
+command. Opening `index.html` directly from disk does not work, because the browser blocks loading the data
+file from `file://`.
 
-### Re-creating the irrigation results (about 5 minutes on a laptop CPU)
+**Reproducibility.** Training uses a fixed random seed (42). Running `train` and then `evaluate` regenerates
+every file in `models/`, `results/` and `web/data/` byte for byte. This was checked with Python 3.11,
+NumPy 2.2, pandas 2.3 and Matplotlib 3.10.
 
-```bash
-python -m agrisense.weather    # download weather again (optional, ~0.5 MB)
-python -m agrisense.train      # train one agent per crop (Maize, Wheat, Tomato)
-python -m agrisense.evaluate   # test on 2021-2024 seasons and redraw all figures
-```
+**Dataset.** `data/` holds the exact weather used for the results. `python -m agrisense.weather` downloads
+it again from Open-Meteo (free, no key). The archive is occasionally revised, so a fresh download can
+differ slightly.
 
-The leaf-disease training code is in `leaf/`. The data download and training steps are documented
-there.
-
-## Deployment
-
-The site is served by **GitHub Pages** from this repository: `index.html` at the root, assets in `web/`.
-It has three tabs:
-
-| Tab | What it shows |
-|---|---|
-| **Overview** | The problem, the two modules and flowcharts of how data, training and the website connect |
-| **Smart irrigation** | Season simulator (crop, city, sowing season, year, policies to plot), the learned rulebook, and results on the 60 unseen test seasons |
-| **Leaf doctor** | Upload or photograph a leaf (or pick a test sample): top-3 diagnoses, heatmap and advice, plus the test-set results |
-
-Irrigation simulations for every city, crop, season, year and policy are precomputed in Python and
-shipped as JSON, together with the trained Q-tables. The leaf model is an ONNX file executed in the
-browser with ONNX Runtime Web. There is no server, so hosting is free and the link always works.
-
-## How the irrigation agent works (one paragraph)
-
-Each day the agent looks at four things: **how dry the soil is** (10 levels), **the crop's growth
-stage** (4), **the rain forecast for the next 3 days** (3), and **how hot/dry the day is** (ET0, 3).
-That is 360 possible situations. It picks an irrigation amount (0/10/20/30/40 mm). A simulator
-built on the FAO-56 soil-water balance then works out what happens to the soil and crop, and
-returns a **reward**: minus (water used + 10 × crop water shortage + water wasted to drainage + a
-fixed cost per irrigation). Over 50,000 simulated seasons, Q-learning fills in a 360 × 5 table of
-"how good is each action in each situation". The final policy is just "pick the best action in
-the table", which you can print and read like a rulebook.
-
-## How the leaf model works (one paragraph)
-
-The photo is resized and normalised, then passed through MobileNetV2. Its convolutional layers turn the
-image into a grid of feature maps (edges, colours, textures, lesion shapes); global average pooling and
-one linear layer turn those into a score per class, and softmax turns scores into probabilities. Training
-first fits only the new linear layer on frozen ImageNet features, then fine-tunes the last convolutional
-blocks. The heatmap is the classifier-weighted sum of the last feature maps (CAM), which for this
-architecture is exactly what the class score is built from.
-
-## Project layout
-
-```
-index.html      the website (entry point for GitHub Pages)
-web/            website assets: scripts, styles, exported JSON data, the ONNX leaf model
-agrisense/      irrigation module (Python)
-  config.py     all settings: cities, crops (FAO-56 values), soil, reward weights, training
-  weather.py    download + cache daily weather from Open-Meteo (free, no API key)
-  env.py        the field simulator (FAO-56 water balance, FAO-33 yield)
-  agents.py     Q-learning agent + 3 baseline policies (same act(obs) interface)
-  train.py      training loop (one agent per crop)
-  simulate.py   run any policy through a season; batch evaluation
-  evaluate.py   test-set evaluation, summary tables, report figures
-leaf/           leaf-disease module: dataset preparation, MobileNetV2 training, ONNX export
-app.py          Streamlit dashboard (local use)
-data/           cached weather CSVs (3 cities x 16 years)
-models/         trained Q-tables (.npz, ~20 KB each)
-results/        evaluation CSVs, leaf_metrics.json and figures used in the report and slides
-docs/           report (.docx), slides (.pptx, with speaker notes), VIVA_PREP.md,
-                and build_report.py / build_slides.py to regenerate them from results/
-```
-
-## Extending it
-
-* **New city:** add it to `CITIES` in `config.py`, then retrain.
-* **New crop:** add a `Crop(...)` entry with FAO-56 values, then run `python -m agrisense.train <Crop>`.
-* **Different priorities:** change `RewardConfig` (for example, raise `water_cost` for water-scarce regions).
-* **A different agent (e.g. DQN):** the environment returns continuous observations, so any agent
-  with an `act(obs) -> mm` method plugs into `simulate.py`.
-* **More diseases or crops:** add PlantVillage (or field) classes in `leaf/`, retrain and re-export the ONNX model.
-
-## Data and references
-
-* Weather: Open-Meteo Historical Weather API (ERA5 reanalysis). <https://open-meteo.com>
-* Leaf images: PlantVillage dataset. Hughes, D. P., Salathé, M. (2015). arXiv:1511.08060.
-* Allen, R. G., Pereira, L. S., Raes, D., Smith, M. (1998). *Crop evapotranspiration*, FAO Irrigation and Drainage Paper 56.
-* Doorenbos, J., Kassam, A. H. (1979). *Yield response to water*, FAO Irrigation and Drainage Paper 33.
-* Sutton, R. S., Barto, A. G. (2018). *Reinforcement Learning: An Introduction*, 2nd ed., MIT Press.
-* Mohanty, S. P., Hughes, D. P., Salathé, M. (2016). Using deep learning for image-based plant disease detection. *Frontiers in Plant Science*, 7, 1419.
-* Sandler, M., et al. (2018). MobileNetV2: Inverted residuals and linear bottlenecks. CVPR.
-* Zhou, B., et al. (2016). Learning deep features for discriminative localization (CAM). CVPR.
+The website is hosted on GitHub Pages straight from this repository (`index.html` at the root).

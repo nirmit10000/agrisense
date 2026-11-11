@@ -1,22 +1,26 @@
-"""Evaluate all trained agents on unseen test seasons (2021-2024) and draw the report figures.
+"""Test the trained agents on unseen seasons (2021-2024), draw the figures and export the website data.
 
     python -m agrisense.evaluate
 
-Outputs in results/:
-    eval_results.csv        one row per crop x city x season x year x policy
-    summary_by_policy.csv   the headline table
-    fig_*.png               charts used in the report, slides and app
+Outputs:
+    results/eval_results.csv        one row per crop x city x season x year x policy
+    results/summary_by_policy.csv   the headline table (summary_by_crop.csv: the same per crop)
+    results/fig_*.png               the figures used in the report
+    web/data/irrigation.json        every season simulated for the website (index.html), which
+                                    cannot run Python, using exactly the same code
 """
+import json
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .config import CITIES, CROPS, DEFAULT_SOIL, RESULTS_DIR, STAGE_NAMES
+from .config import (CITIES, CROPS, DEFAULT_SOIL, IRRIGATION_ACTIONS_MM, RESULTS_DIR, SOILS,
+                     STAGE_NAMES, TEST_YEARS, WEB_DATA, RewardConfig, TrainConfig, model_path)
 from .env import IrrigationEnv
-from .agents import QLearningAgent, StateEncoder, ThresholdPolicy
-from .simulate import evaluate, model_path, run_season
+from .agents import FixedSchedulePolicy, QLearningAgent, RainfedPolicy, StateEncoder, ThresholdPolicy
 from . import weather as wx
 
 # ---- chart style (validated categorical palette; colour always paired with a legend/label)
@@ -57,6 +61,59 @@ def summarise(df: pd.DataFrame) -> pd.DataFrame:
     g["water_productivity_kg_per_m3"] = np.where(g._w > 0, g._y * 1000 / (g._w * 10), np.nan)
     order = list(POLICY_COLORS)
     return g.drop(columns=["_y", "_w"]).reindex(order).round(2)
+
+
+# ------------------------------------------------------------------------- simulation
+def run_season(env: IrrigationEnv, policy, start_index: int):
+    """Simulate one full season. Returns (summary dict, daily log DataFrame)."""
+    obs = env.reset(start_index)
+    rows, total_reward, done = [], 0.0, False
+    while not done:
+        irrigation = policy.act(obs)
+        obs, reward, done, info = env.step(irrigation)
+        total_reward += reward
+        rows.append(info)
+    log = pd.DataFrame(rows)
+    rel_yield = env.relative_yield()
+    water = log["irrigation_mm"].sum()
+    yield_t = rel_yield * env.crop.max_yield_t_ha
+    summary = dict(
+        policy=policy.name,
+        irrigation_mm=water,
+        irrigation_events=int((log["irrigation_mm"] > 0).sum()),
+        rain_mm=log["rain_mm"].sum(),
+        wasted_mm=log["wasted_irrigation_mm"].sum(),
+        stress_days=int((log["ks"] < 1).sum()),
+        relative_yield=rel_yield,
+        yield_t_ha=yield_t,
+        # kg of produce per cubic metre of irrigation water (1 mm over 1 ha = 10 m^3)
+        water_productivity=(yield_t * 1000) / (water * 10) if water > 0 else np.nan,
+        total_reward=total_reward,
+    )
+    return summary, log
+
+
+def all_policies(crop_name: str):
+    return [QLearningAgent.load(model_path(crop_name)), ThresholdPolicy(),
+            FixedSchedulePolicy(), RainfedPolicy()]
+
+
+def evaluate_policies(weather_by_city: dict, years=TEST_YEARS, crops=None, seed=123) -> pd.DataFrame:
+    """Every policy x city x crop x realistic sowing season x test year."""
+    rows = []
+    for crop_name in crops or CROPS:
+        crop = CROPS[crop_name]
+        policies = all_policies(crop_name)
+        for city, weather in weather_by_city.items():
+            for season, mmdd in crop.seasons.items():
+                for year in years:
+                    for policy in policies:
+                        # same seed per season -> every policy sees identical forecast errors
+                        env = IrrigationEnv(weather, crop, DEFAULT_SOIL, seed=seed + year)
+                        summary, _ = run_season(env, policy, env.index_of(f"{year}-{mmdd}"))
+                        rows.append(dict(crop=crop_name, city=city, season=season,
+                                         year=year, **summary))
+    return pd.DataFrame(rows)
 
 
 # ------------------------------------------------------------------------- figures
@@ -185,10 +242,100 @@ def fig_policy_heatmap(crop_name="Maize"):
     _save(fig, "fig_policy_heatmap.png")
 
 
+# ------------------------------------------------------------------------- website data
+WEB_YEARS = range(2010, 2025)   # the website shows training and test years
+
+
+def _r(x, nd=1):
+    return None if x is None or (isinstance(x, float) and np.isnan(x)) else round(float(x), nd)
+
+
+def export_web(weather: dict):
+    """Simulate every season 2010-2024 with all four policies and write web/data/irrigation.json."""
+    soil = SOILS[DEFAULT_SOIL]
+    out = dict(
+        actions_mm=list(IRRIGATION_ACTIONS_MM), stages=STAGE_NAMES, test_years=list(TEST_YEARS),
+        train_years=[2010, 2020], reward=RewardConfig().__dict__,
+        train=dict(episodes=TrainConfig().episodes, alpha=[TrainConfig().alpha_start, TrainConfig().alpha_end],
+                   epsilon=[TrainConfig().eps_start, TrainConfig().eps_end], gamma=TrainConfig().gamma),
+        rain_labels=StateEncoder.RAIN_LABELS, et0_labels=StateEncoder.ET0_LABELS,
+        cities={}, crops={}, seasons={}, rulebook={}, training={}, summary={},
+    )
+
+    for city, w in weather.items():
+        m = w.assign(month=w.date.dt.month, year=w.date.dt.year)
+        m = m[m.year < 2025]
+        out["cities"][city] = dict(
+            climate=CITIES[city]["climate"], lat=CITIES[city]["lat"], lon=CITIES[city]["lon"],
+            annual_rain=_r(m.groupby("year").rain_mm.sum().mean(), 0),
+            annual_et0=_r(m.groupby("year").et0_mm.sum().mean(), 0),
+            monthly_rain=[_r(v) for v in m.groupby(["year", "month"]).rain_mm.sum().groupby("month").mean()],
+            monthly_et0=[_r(v) for v in m.groupby(["year", "month"]).et0_mm.sum().groupby("month").mean()],
+        )
+
+    for crop_name, crop in CROPS.items():
+        taw = soil.taw(crop.root_depth_m)
+        out["crops"][crop_name] = dict(
+            season_length=crop.season_length, stage_days=list(crop.stage_days), seasons=crop.seasons,
+            kc=[crop.kc_ini, crop.kc_mid, crop.kc_end], root_depth_m=crop.root_depth_m, p=crop.p, ky=crop.ky,
+            max_yield_t_ha=crop.max_yield_t_ha, taw_mm=_r(taw), raw_mm=_r(crop.p * taw),
+            stress_line_pct=_r(100 * (1 - crop.p)))
+        policies = all_policies(crop_name)
+        agent = policies[0]
+
+        # rulebook: [stage][et0 level] -> 10 x 3 grid of best mm (None = rare)
+        out["rulebook"][crop_name] = [[[[None if np.isnan(v) else int(v) for v in row]
+                                        for row in agent.policy_grid(st, e)]
+                                       for e in range(3)] for st in range(4)]
+        tr = pd.read_csv(RESULTS_DIR / f"training_{crop_name.lower()}.csv")
+        out["training"][crop_name] = dict(episode=[int(v) for v in tr.episode],
+                                          reward=[_r(v, 0) for v in tr.reward],
+                                          water=[_r(v, 0) for v in tr.irrigation_mm])
+
+        for city, w in weather.items():
+            for season, mmdd in crop.seasons.items():
+                for year in WEB_YEARS:
+                    key = f"{crop_name}|{season}|{city}|{year}"
+                    entry = dict(sow=f"{year}-{mmdd}", test=year in TEST_YEARS, policies={})
+                    for policy in policies:
+                        env = IrrigationEnv(w, crop, DEFAULT_SOIL, seed=123 + year)
+                        s, log = run_season(env, policy, env.index_of(f"{year}-{mmdd}"))
+                        if "rain" not in entry:
+                            entry["rain"] = [_r(v) for v in log.rain_mm]
+                            entry["et0"] = [_r(v) for v in log.et0_mm]
+                        entry["policies"][policy.name] = dict(
+                            soil=[int(round(100 * (1 - d / taw))) for d in log.depletion_mm],
+                            irr=[int(round(v)) for v in log.irrigation_mm],
+                            stress=[int(k < 1) for k in log.ks],
+                            water=_r(s["irrigation_mm"], 0), events=s["irrigation_events"],
+                            wasted=_r(s["wasted_mm"]), stress_days=s["stress_days"],
+                            yield_pct=_r(100 * s["relative_yield"]), yield_t=_r(s["yield_t_ha"], 2),
+                            wp=_r(s["water_productivity"], 2))
+                    out["seasons"][key] = entry
+
+    out["policies"] = [p.name for p in all_policies("Maize")]
+    bp = pd.read_csv(RESULTS_DIR / "summary_by_policy.csv").round(2)
+    out["summary"]["by_policy"] = bp.astype(object).where(pd.notna(bp), None).to_dict("records")
+    ev = pd.read_csv(RESULTS_DIR / "eval_results.csv")
+    out["summary"]["n_test_seasons"] = len(ev) // 4
+    out["summary"]["by_city"] = (ev.groupby(["city", "policy"])
+                                 .agg(water=("irrigation_mm", "mean"), yield_pct=("relative_yield", "mean"))
+                                 .assign(yield_pct=lambda d: 100 * d.yield_pct).round(1).reset_index()
+                                 .to_dict("records"))
+    out["summary"]["by_crop"] = (ev.groupby(["crop", "policy"])
+                                 .agg(water=("irrigation_mm", "mean"), yield_pct=("relative_yield", "mean"))
+                                 .assign(yield_pct=lambda d: 100 * d.yield_pct).round(1).reset_index()
+                                 .to_dict("records"))
+
+    WEB_DATA.parent.mkdir(parents=True, exist_ok=True)
+    WEB_DATA.write_text(json.dumps(out, separators=(",", ":"), allow_nan=False), encoding="utf-8")
+    print(f"wrote {WEB_DATA} ({WEB_DATA.stat().st_size / 1e6:.2f} MB, {len(out['seasons'])} seasons)")
+
+
 def main():
     RESULTS_DIR.mkdir(exist_ok=True)
     weather = wx.load_all()
-    df = evaluate(weather)
+    df = evaluate_policies(weather)
     df.to_csv(RESULTS_DIR / "eval_results.csv", index=False)
     summary = summarise(df)
     summary.to_csv(RESULTS_DIR / "summary_by_policy.csv")
@@ -207,6 +354,8 @@ def main():
     print(f"{len(df)} test simulations\n")
     print(summary)
     print("\nBy crop:\n", by_crop)
+
+    export_web(weather)
 
 
 if __name__ == "__main__":

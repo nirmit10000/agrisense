@@ -1,5 +1,5 @@
 /* AgriSense static site.
- * Irrigation seasons are precomputed in Python (agrisense/export_web.py -> web/data/irrigation.json). */
+ * Irrigation seasons are precomputed in Python (agrisense/evaluate.py -> web/data/irrigation.json). */
 (() => {
   "use strict";
 
@@ -25,7 +25,7 @@
     ink.style.transform = `translateX(${btn.offsetLeft}px)`;
   }
   function selectTab(name) {
-    name = { agent: "irrigation", results: "irrigation", about: "overview", leaf: "overview" }[name] || name;   // old links
+    name = { agent: "irrigation", results: "irrigation" }[name] || name;   // old links
     if (!$(`[data-panel="${name}"]`)) name = "overview";
     state.tab = name;
     $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));

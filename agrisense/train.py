@@ -14,10 +14,9 @@ import numpy as np
 import pandas as pd
 
 from .config import (CROPS, DEFAULT_SOIL, MODEL_DIR, RESULTS_DIR, TRAIN_YEARS,
-                     RewardConfig, TrainConfig)
+                     RewardConfig, TrainConfig, model_path)
 from .env import IrrigationEnv
 from .agents import QLearningAgent
-from .simulate import model_path
 from . import weather as wx
 
 

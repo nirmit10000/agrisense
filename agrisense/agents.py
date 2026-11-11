@@ -50,7 +50,7 @@ class StateEncoder:
     ET0_BINS = np.array([3.0, 5.0])                # low / medium / high  (mm/day)
     SHAPE = (10, 4, 3, 3)
 
-    RAIN_LABELS = [f"<2 mm", "2-15 mm", ">15 mm"]
+    RAIN_LABELS = ["<2 mm", "2-15 mm", ">15 mm"]
     ET0_LABELS = ["low (<3)", "medium (3-5)", "high (>5)"]
 
     @property
@@ -98,7 +98,7 @@ class QLearningAgent:
         self.q[s, a] += self.alpha * (target - self.q[s, a])
         self.visits[s, a] += 1
 
-    # ---- inspection helpers (used by the app / report to explain the policy)
+    # ---- inspection helper (used by the website and report to show the learned policy)
     def policy_grid(self, stage: int, et0_level: int, min_visits: int = 50) -> np.ndarray:
         """Best irrigation (mm) for every (dryness level, rain-forecast level).
 
